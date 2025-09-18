@@ -1,11 +1,13 @@
 #pragma once
 
-#include <string>
+#include <cstring>
 #include <map>
 #include <mutex>
+#ifndef __NO_TESLA_H
+#include <tesla.hpp>
+#endif
 #ifndef __NO_SWITCH_H
 #include <switch.h>
-#include <tesla.hpp>
 #else
 using u16 = std::uint16_t;
 using u32 = std::uint32_t;
@@ -44,7 +46,9 @@ constexpr std::string_view SETTING_SHMEM_HANDLE = "shmem_handle";
 using UserId = std::string;
 using UserNickName = std::string;
 
+#ifndef __NO_TESLA_H
 constexpr tsl::Color ColorError = { 0xF, 0x0, 0x0, 0xF };
+#endif
 
 struct GameSession {
     u64 game_id;

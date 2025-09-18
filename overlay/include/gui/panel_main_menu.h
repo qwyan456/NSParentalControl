@@ -15,6 +15,9 @@ public:
     // Called once every frame to handle inputs not handled by other UI elements
     virtual bool handleInput(u64 keysDown, u64 keysHeld, const HidTouchState &touchPos, HidAnalogStickState joyStickPosLeft, HidAnalogStickState joyStickPosRight) override;
 
+private:
+    void startTest();
+
 private:    
     tsl::elm::OverlayFrame* rootFrame_ = nullptr;
     tsl::elm::List* rootList_ = nullptr;

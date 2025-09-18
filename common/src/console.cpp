@@ -91,7 +91,7 @@ GameSession getCurrentGame(UserSession& user) {
     u64 appId = appletGetAppletResourceUserId();
     
     GameSession g;
-    printf("Current App ID: %016llX\n", appId);
+    printf("Current App ID: %016lX\n", appId);
 
     if(appId == 0) {
         printf("No game loaded.");

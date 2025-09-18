@@ -1,5 +1,7 @@
 # NS Parental Control
 
+⚠️ **Warning**: This is a proof of concept in development.
+
 NS Parental Control is a simple app that allows parents to set limits on their children’s use of the Nintendo Switch console.
 
 *This is a proof-of-concept of an app and was made only for experimenting app development on the Nintendo Switch.* 

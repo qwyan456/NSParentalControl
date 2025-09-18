@@ -1,11 +1,13 @@
 #include "panel_main_menu.h"
-#include "tesla.hpp"
-#include "switch.h"
 #include "database.h"
 #include "console.h"
 #include "version.h"
 #include "functions.h"
 #include "gui_helpers.h"
+#include "logger.h"
+#include "pctrl_protocol.h"
+#include <tesla.hpp>
+#include <switch.h>
 
 MainMenu::MainMenu() {
 }
@@ -31,6 +33,27 @@ tsl::elm::Element* MainMenu::createUI() {
     return rootFrame_;
 }
 
+void MainMenu::startTest() {
+    Service pctrl_service;
+    TipcService service;
+    Result res = smGetService(&pctrl_service, "pctrl:u");
+    if(R_FAILED(res)) {
+        logToFile("Overlay: could not open service");
+        return;
+    }
+        
+    tipcCreate(&service, pctrl_service.own_handle);
+    if(service.session == 0) {
+        logToFile("Overlay: could not create Tipc session");
+        return;
+    }
+
+    /* Start listening */
+
+    /* Send a test command */
+    tipcDispatch(&service, CmdTestTimeout);
+}
+
 void MainMenu::rebuildUI() {
     //if(!active_) return;
 
@@ -38,7 +61,7 @@ void MainMenu::rebuildUI() {
     // be visible or not depending on the needs    
 
     if(!isParentalControlInitialized()) {
-        auto* entryInitialize = new tsl::elm::ListItem("Initialize Parental Control");        
+        auto entryInitialize = new tsl::elm::ListItem("Initialize Parental Control");        
         rootList_->addItem(entryInitialize);
 
         entryInitialize->setClickListener([this, entryInitialize](u64 keys) {
@@ -55,9 +78,25 @@ void MainMenu::rebuildUI() {
         const auto users = getUsersList();
 
         rootList_->addItem(new tsl::elm::CategoryHeader("Choose user", true));
-        for(const auto& [uid, nick_name]: users) {
-            rootList_->addItem(new tsl::elm::ListItem(nick_name));
+        if(users.empty()) {
+            rootList_->addItem(new tsl::elm::ListItem("No user found"));
+        } else {
+            for(const auto& [uid, nick_name]: users) {
+                rootList_->addItem(new tsl::elm::ListItem(nick_name));
+            }
         }
+
+        auto entryTest = new tsl::elm::ListItem("Run test");
+        rootList_->addItem(entryTest);
+        entryTest->setClickListener([this, entryTest](u64 keys) {
+            if(keys & HidNpadButton_A) {
+                startTest();
+                return true;
+            }
+
+            return false;
+        });
+
     }
 
     /*list->addItem(new tsl::elm::ListItem(makeUserProfileLabel(user_)));

@@ -4,17 +4,28 @@
 #include <map>
 #include <ctime>
 #include <cstring>
+#include <switch.h>
 
 #define TESLA_INIT_IMPL
 #include "tesla.hpp"
 #include "gui/main_overlay.h"
+#include "logger.h"
 
 //Examples : https://github.com/masagrator/Status-Monitor-Overlay/blob/master/source/main.cpp
 
 const bool CIPHER_DATABASE = false;
 
 int main(int argc, char** argv) {
-    tsl::loop<MainOverlay>(argc, argv);                        
+    Result rc = smInitialize();
+    rc = fsInitialize();
+    
+    // Disable this if you don't want to use the SD card filesystem.
+    rc = fsdevMountSdmc();    
+
+    setLogFilename("sdmc:/switch/nsparentalcontrol_ovl.log");
+    clearLog();
+
+    tsl::loop<MainOverlay>(argc, argv);    
 
     /*const size_t KEY_LEN = 32;
     uint8_t key[KEY_LEN];
@@ -33,5 +44,7 @@ int main(int argc, char** argv) {
     }
 
     decryptFile("/switch/NSParentalControl/sessions.txt", key, CIPHER_DATABASE);*/
-
+    fsdevUnmountAll(); 
+    fsExit(); 
+    smExit();
 }
