@@ -43,9 +43,9 @@ APP_VERSION 	:= 		1.0.2
 
 TARGET		:=	parental_control
 BUILD		:=	build
-SOURCES		:=	src src/gui ../common/src
+SOURCES		:=	src src/gui
 DATA		:=	data
-INCLUDES	:=	include include/gui ../common/include ../libtesla/include
+INCLUDES	:=	include include/gui ../libtesla/include
 
 NO_ICON		:=  1
 

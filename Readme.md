@@ -21,6 +21,17 @@ Parental control has the following features:
 - Set the parental access code (PIN).
 - Show the remaining time (user).
 
+[] overlay: set admin PIN
+[] overlay: unlock settings with admin PIN
+[] overlay: set the daily limit
+[] overlay: show the daily limit
+[] overlay: show the current usage
+[] sysmodule: provide functions to the overlay
+  [] set the daily limit
+  [] get the daily limit
+  [] get users list
+  [] get user's current usage
+
 ## Coming features
 
 The following features are in the backlog:
@@ -39,7 +50,7 @@ You can:
 You must:
 - share your changes by committing on this repository or your own fork.
 
-You cannot :
+You are not allowed to:
 - close the sources,
 - sell the product,
 - reuse the source code in a commercial product,
@@ -52,68 +63,80 @@ Libraries linked or code reused:
 - Tesla,
 - libNX.
 
-## Build
+## Installation
+
+Download the latest release from [GitHub]().
+
+Unzip the file. It contains both the sysmodule in the folder `sysmodule` and the overlay in the folder `overlay`.
+
+The sysmodule folder contains another folder named `0420000000003103`. It must be copied in the folder `/atmosphere/contents/` on the Switch (SD Card preferably).
+
+The overlay folder's content (`parental_control.ovl` and `parental_control.json` files) must be copied into the folder `/switch/.overlays/` on the Switch (SD Card preferably).
+
+## Build and install
 
 This section explains how to create and install the binary for NS Parental Control.
 
 ### Architecture
 
 This product relies on 3 components:
-1 - a sysmodule that monitors the games usage and notifies when limit is reached.
+1 - a sysmodule that monitors the games usage and notifies when limit is reached. 
 2 - an overlay that shows on demand information about the limits and permits setup of the limits.
 
 The sysmodule and the overlay share a common database file. 
 
-### Pre-requisistes
+### Pre-requisistes for runtime
 
 - Atmosphere installed
+- Tesla menu installed
+
+### Pre-requisites for build
+
 - Development computer with `devkitPro` and `devkitA64` (see below)
 - `libnx` (Switch homebrew SDK) installed via devkitPto
-- Tesla menu installed on the Switch
+- Atmosphere source code (see below)
 
 ### devkitPro and devkitA64 installation
 
-#### Linux Debian
+Installation of devkitPro is described on [this page](https://switchbrew.org/wiki/Setting_up_Development_Environment).
 
-```
-sudo apt install git make cmake build-essential
-wget https://apt.devkitpro.org/devkitpro-keyring_20230702_all.deb
-sudo dpkg -i devkitpro-keyring_20230702_all.deb
-sudo apt update
-sudo apt install devkitpro-dev
-sudo apt install devkitarm-dev devkita64-dev
-``` 
+### Download Atmosphere source code
 
-#### Mac OS
- 
-- Download and install the latest pacman release from [GitHub](https://github.com/devkitPro/pacman/releases).
-- Follow the instructions on [this page](https://devkitpro.org/wiki/devkitPro_pacman#macOS) to install the needed packages.
+Atmosphere source code is needed to build the sysmodule.
 
-### Compilation
+The code can be downloaded using [this link](https://github.com/Atmosphere-NX/Atmosphere/archive/refs/heads/master.zip) or by cloning the repository using the repo URL https://github.com/Atmosphere-NX/Atmosphere.git.
 
-- Go to the root directory of the project (usually `NSParentalControl`)
-- Choose the component you want to build by entering its directory (for example `$ cd sysmodule` for the sysmodule)
-- Run `make`
+### Build Atmosphere sysmodule
 
-### Installation
+Once the code is downloaded or cloned do the following:
 
-Install the sysmodule:
-```
-/atmosphere/contents/0004000000000000/exefs.nsp
-/atmosphere/contents/0004000000000000/toolbox.json
-/atmosphere/contents/0004000000000000/flags/boot2.flag
-```
+- copy the folder `pctrl` into `<Atmosphere source dir>/stratosphere/`.
+- append `pctrl` to the declaration of `MODULES` in `<Atmosphere source dir>/stratosphere/stratosphere.mk` or run `$ sed -i.bak 's/^\(ALL_MODULES :=.*\)$/\1 pctrl/' stratosphere.mk`
+- build stratosphere by running `$ make` in the directory `<Atmosphere source dir>/stratosphere`.
 
-Install the overlay:
-*TODO*
+You way need to build Atmosphere in a first step by running the command `$ make` in the root of Atmosphere directory.
+
+At the end of the build, the sysmodule is available in the directory `<Atmosphere source dir>/stratosphere/pctrl/out/nintendo_nx_arm64_armv8a/release/pctrl.nsp`. 
+
+Rename it to `exefs.nsp`.
+
+This file should be copied in the directory `/atmosphere/contents/0420000000003103` of the SD card of the Switch.
+
+### Build the ovverlay
+
+Go to the directory `NSParentalControl/overlay`.
+
+Run the command `$ make`. At the end of the compilation process, the directory contains a file name `parental_control.ovl`. 
+
+Copy this file in the directory `/switch/.overlays/` in the SD card of the Switch.
 
 ### Auto-start Parental Control
 
-- On the SD card, create the folder `/atmosphere/contents/0004000000000000/ParentalControl/` (if 0004000000000000 already exists, choose another one randomly).
-- Copy the file `ParentalControl.nro` into the new folder and rename it to `main.nro`.
-- Create a new folder `/atmosphere/contents/0004000000000000/ParentalControl/meta/`.
-- Copy the file `meta.ini` provided into this folder.
+In order for the parental control to load on startup you have to create a new folder named `flags` into `/atmosphere/contents/0420000000003103`. 
+
+In this folder create an empty file named `TO COMPLETE`.
 
 ## References
 
 https://github.com/switchbrew/switch-examples/tree/master
+

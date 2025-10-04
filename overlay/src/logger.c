@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-const char* logfilename = "sdmc:/switch/nsparentalcontrol.log";
+const char* logfilename = "sdmc:/switch/pctrl_ovl.log";
 void setLogFilename(const char* filename) {
     logfilename = filename;
 }

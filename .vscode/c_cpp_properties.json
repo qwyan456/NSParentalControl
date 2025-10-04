@@ -5,11 +5,14 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/overlay/**",
-                "/opt/devkitpro/libnx/include",                
+                "/opt/devkitpro/libnx/include",
                 "${workspaceFolder}/libtesla/include",
-                "/opt/homebrew/Cellar/sdl2/2.32.10/include"
+                "/opt/devkitpro/portlibs/switch/include/**",
+                "/Users/tristan/Documents/Sources/Atmosphere/libraries/libstratosphere/include"
+                /*"${workspaceFolder}/Atmosphere/libraries/libvapours/include",
+                "${workspaceFolder}/Atmosphere/libraries/libstratosphere/include/stratosphere/os" */
             ],
-            "defines": ["__SWITCH__"],
+            "defines": ["__SWITCH__", "ATMOSPHERE_BOARD_NINTENDO_NX", "ATMOSPHERE_ARCH_64"],
             "compilerPath": "/usr/bin/clang++",
             "cStandard": "c17",
             "cppStandard": "c++20",

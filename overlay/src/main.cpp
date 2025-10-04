@@ -10,41 +10,60 @@
 #include "tesla.hpp"
 #include "gui/main_overlay.h"
 #include "logger.h"
+#include "AppContext.h"
 
 //Examples : https://github.com/masagrator/Status-Monitor-Overlay/blob/master/source/main.cpp
 
 const bool CIPHER_DATABASE = false;
+constexpr SmServiceName service_name = smEncodeName("pctrl");
+
+bool connectToService() {
+    u8 exists(0);
+    Result res = tipcDispatchInOut(smGetServiceSessionTipc(), 65100, service_name, exists);
+    if(R_FAILED(res) || !exists) {
+        logToFile("[Overlay] could not find the service");
+        return false;
+    } 
+        
+    logToFile("[Overlay] the service pctrl has been found");    
+
+    res = smGetServiceWrapper(&getAppContext().pctrl_service, service_name);
+    if(R_FAILED(res)) {
+        logToFile("[Overlay] could not open service");
+        logIntToFile(R_MODULE(res));
+        logIntToFile(R_DESCRIPTION(res));
+        return false;
+    }
+
+    logToFile("[Overlay] Connexion au service effectuée");
+    logIntToFile(getAppContext().pctrl_service.session);
+    getAppContext().is_ready = true;
+
+    return true;
+}
 
 int main(int argc, char** argv) {
     Result rc = smInitialize();
     rc = fsInitialize();
     
     // Disable this if you don't want to use the SD card filesystem.
-    rc = fsdevMountSdmc();    
+    rc = fsdevMountSdmc();
 
-    setLogFilename("sdmc:/switch/nsparentalcontrol_ovl.log");
+    setLogFilename("sdmc:/switch/pctrl_ovl.log");
     clearLog();
+    
+    connectToService();    
 
     tsl::loop<MainOverlay>(argc, argv);    
 
-    /*const size_t KEY_LEN = 32;
-    uint8_t key[KEY_LEN];
-
-    std::ifstream infile(KEY_FILE, std::ios::binary);
-    if (infile.good()) {
-        infile.read(reinterpret_cast<char*>(key), KEY_LEN);
-        infile.close();
-        printf("Loaded existing key.\n");
-    } else {
-        generateKey(key, KEY_LEN);
-        std::ofstream outfile(KEY_FILE, std::ios::binary);
-        outfile.write(reinterpret_cast<char*>(key), KEY_LEN);
-        outfile.close();
-        printf("Generated new console key.\n");
+    logToFile("[Overlay] Close session");
+    if(getAppContext().is_ready) {
+        svcCloseHandle(getAppContext().pctrl_service.session);   
     }
 
-    decryptFile("/switch/NSParentalControl/sessions.txt", key, CIPHER_DATABASE);*/
+    logToFile("[Overlay] Exiting overlay");
+
     fsdevUnmountAll(); 
     fsExit(); 
-    smExit();
+    smExit();    
 }

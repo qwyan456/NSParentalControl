@@ -1,7 +1,5 @@
 #include "main_overlay.h"
-#include "switch.h"
-#include "console.h"
-#include "database.h"
+#include <switch.h>
 #include <tesla.hpp>
 #include "panel_main_menu.h"
 
