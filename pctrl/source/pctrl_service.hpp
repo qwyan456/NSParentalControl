@@ -27,7 +27,7 @@ namespace alefbet::pctrl::srv {
 
     class PctrlService {
         public:
-            PctrlService(Ipc::Server* ipcServer, u8* heap_pointer);
+            PctrlService(Ipc::Server* ipcServer/*, u8* heap_pointer*/);
             ~PctrlService();
             void listen();            
             //void closeAndClean();
@@ -41,9 +41,10 @@ namespace alefbet::pctrl::srv {
             Ipc::Result getRunningApplication(Ipc::Request* request);
             Ipc::Result getCurrentUser(Ipc::Request* request);
             Ipc::Result getUsersList(Ipc::Request*);
-            Ipc::Result getUserData(const std::string&, Ipc::Request*);
-            void setUserLimits(const std::string&, const u32&);
-            void setAdminPin(const std::string&);
+            Ipc::Result getUserUsageTime(const std::string&, Ipc::Request*);
+            Ipc::Result getUserRemainingTime(const std::string&, Ipc::Request*);
+            Ipc::Result setUserLimits(const std::string&, const u32&);
+            Ipc::Result setAdminPin(const std::string&);
             Ipc::Result verifyAdminPin(const std::string&, Ipc::Request*);
 
         private:
@@ -52,7 +53,7 @@ namespace alefbet::pctrl::srv {
             //Handle handle_server = 0;
             //Handle handle_client = 0;     
             Ipc::Server *ipcServer_ = nullptr;
-            u8* heap_pointer_ = nullptr;
+            //u8* heap_pointer_ = nullptr;
             GuiController gui_;
     };
 

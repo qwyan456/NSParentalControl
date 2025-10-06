@@ -16,6 +16,7 @@
 #include <switch.h>
 #include <thread>
 #include <cstring>
+#include <map>
 #include "pctrl_service.hpp"
 #include "pctrl_font.hpp"
 #include "logger.h"
@@ -23,15 +24,20 @@
 #include "ipc/Result.hpp"
 #include "pctrl_screen.hpp"
 #include "ams_bpc.h"
+#include "helpers.h"
+//#include "database/settings.h"
+//#include "database/database.h"
 
 //#define PSEC_DEBUG 1
 
 using namespace alefbet::pctrl::logger;
+//using namespace alefbet::pctrl::database;
+using namespace alefbet::pctrl::helpers;
 
 namespace alefbet::pctrl::srv {       
 
-    PctrlService::PctrlService(Ipc::Server* ipcServer, u8* heap_pointer)
-    : ipcServer_(ipcServer), heap_pointer_(heap_pointer) {
+    PctrlService::PctrlService(Ipc::Server* ipcServer/*, u8* heap_pointer*/)
+    : ipcServer_(ipcServer)/*, heap_pointer_(heap_pointer)*/ {
         logToFile("[Service] Starting service\n");        
         ipcServer_->setRequestHandler([this](Ipc::Request * r) -> uint32_t {
             return static_cast<uint32_t>(this->commandThread(r));
@@ -40,6 +46,7 @@ namespace alefbet::pctrl::srv {
 
         /* Load shared font. */
         alefbet::pctrl::font::InitializeSharedFont();
+        logToFile("[Service] Shared font loaded\n");
     }    
 
     PctrlService::~PctrlService() {
@@ -48,7 +55,7 @@ namespace alefbet::pctrl::srv {
         }*/
     }
 
-    namespace helpers {
+    namespace actions {
         #define IRAM_PAYLOAD_MAX_SIZE 0x24000
         static u8 g_reboot_payload[IRAM_PAYLOAD_MAX_SIZE];
 
@@ -83,35 +90,7 @@ namespace alefbet::pctrl::srv {
                 spsmShutdown(true);
             }
         }
-
-        u64 getRunningApplicationPid() {
-            u64 process_id = 0;
-
-            ::Result rc = pmdmntGetApplicationProcessId(&process_id);
-            if(R_FAILED(rc)) {
-                logToFile("[Service] Could not get application process ID: %i\n", rc);
-                return 0;
-            }
-
-            return process_id;
-        }
-
-        u64 getRunningApplicationTitleId() {
-            u64 title_id = 0;
-
-            auto process_id = getRunningApplicationPid();
-            if(process_id == 0) {
-                return 0;
-            }
-
-            ::Result rc = pmdmntGetProgramId(&title_id, process_id);
-            if(R_FAILED(rc)) {
-                logToFile("[Service] Could not get the title ID for the process %i\n", process_id);
-                return 0;
-            }
-
-            return title_id;
-        }
+        
     }
 
     void PctrlService::showScreenTimeout() {        
@@ -127,7 +106,7 @@ namespace alefbet::pctrl::srv {
         while(true) {
             padUpdate(&pad);
             u64 kDown = padGetButtonsDown(&pad);
-
+        
             if(kDown & HidNpadButton_Minus) {
                 logToFile("[Service] User wants to shutdown\n");
                 #ifdef PSEC_DEBUG
@@ -135,7 +114,7 @@ namespace alefbet::pctrl::srv {
                     gui_.HideScreen();
                 #else 
                     // Otherwise we shut the system down
-                    helpers::reboot_to_payload();
+                    actions::reboot_to_payload();
                 #endif
 
                 return; //Stop monitoring the buttons
@@ -146,63 +125,105 @@ namespace alefbet::pctrl::srv {
     }
 
     Ipc::Result PctrlService::getRunningApplication(Ipc::Request* request) {
-        //auto process_id = helpers::getRunningApplicationPid();
-        auto title_id = helpers::getRunningApplicationTitleId();
+        auto process_id = helpers::getRunningApplicationPid();
+        auto title_id = helpers::getRunningApplicationTitleId(process_id);
+        auto app_name = helpers::getApplicationName(title_id);
 
-        request->appendReplyValue(title_id);
+        request->appendReplyValue(app_name);
         return Ipc::Result::Ok;
     }
 
     Ipc::Result PctrlService::getCurrentUser(Ipc::Request* request) {            
-        ::Result rc = accountInitialize(AccountServiceType_System);
-        if(R_FAILED(rc)) {
-            logToFile("[Service] Could not initialize account service: %i\n", rc);
-            return Ipc::Result::Error;
-        }
-
-        AccountUid uid;
-        rc = accountGetPreselectedUser(&uid);
-        if(R_FAILED(rc)) {
-            logToFile("[Service] Could not get preselected user: %i\n", rc);
-            accountExit();
-            return Ipc::Result::Error;
-        }
-
-        AccountProfile profile;
-        AccountUserData user_data;
-        AccountProfileBase base;
-        rc = accountProfileGet(&profile, &user_data, &base);
-        if(R_FAILED(rc)) {
-            logToFile("[Service] Could not get account profile: %i\n", rc);
-            accountProfileClose(&profile);
-            accountExit();
-            return Ipc::Result::Error;
-        }
-
-        request->appendReplyValue(std::string(base.nickname));
-        accountProfileClose(&profile);
-        accountExit();
+        const auto current_user = helpers::getCurrentUser();
+        request->appendReplyValue(current_user);
 
         return Ipc::Result::Ok;
     }
 
     Ipc::Result PctrlService::getUsersList(Ipc::Request*) {
+        // Useful?
         return Ipc::Result::Ok;
     }
 
-    Ipc::Result PctrlService::getUserData(const std::string&, Ipc::Request*) {
+    Ipc::Result PctrlService::getUserUsageTime(const std::string& uid, Ipc::Request*) {
+        const auto uidS = accountUidFromString(uid);
+        logToFile("[Service] Get remaining time for user %s\n", uidS);
+
+        /*const auto history = getHistory(uidS, today());
+        auto usage_time_in_minutes = (u16)0;        
+
+        // Compute the total usage for today 
+        for(const auto& entry: history) {
+            usage_time_in_minutes += entry.durationInMinutes();
+        }
+
+        // Get the daily limit
+        auto settings = loadSettings();
+        const auto daily_limit = settings[SETTING_DAILY_LIMIT_GLOBAL].int_value;
+        auto remaining_time_in_minutes = daily_limit - usage_time_in_minutes;
+
+        logToFile("[Service] User=%s, usage=%i minutes, remaining=%i minutes", uidS, usage_time_in_minutes, remaining_time_in_minutes);
+
+        request->appendReplyValue(remaining_time_in_minutes);*/
+
         return Ipc::Result::Ok;
     }
 
-    void PctrlService::setUserLimits(const std::string&, const u32&) {
+    Ipc::Result PctrlService::getUserRemainingTime(const std::string& uid, Ipc::Request* ) {
+        const auto uidS = accountUidFromString(uid);
+        logToFile("[Service] Get usage time for user %s\n", uidS);
+
+        /*const auto history = getHistory(uidS, today());
+        auto usage_time_in_minutes = (u16)0;        
+
+        // Compute the total usage for today 
+        for(const auto& entry: history) {
+            usage_time_in_minutes += entry.durationInMinutes();
+        }
+
+        logToFile("[Service] User=%s, usage=%i minutes", uidS, usage_time_in_minutes);
+
+        request->appendReplyValue(usage_time_in_minutes);*/
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::setUserLimits(const std::string&, const u32& ) {
+        // Now the limit is global not per user so we don't use the first argument
+
+        /*auto settings = loadSettings();
+
+        Setting setting;        
+        setting.key = SETTING_DAILY_LIMIT_GLOBAL;
+        setting.type = INTEGER;
+        setting.int_value = limit_in_minutes;        
+
+        saveSetting(settings, setting);*/
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::setAdminPin(const std::string& pin) {
+        logToFile("[Service] Setting admin PIN to %s", pin);
+        /*auto settings = loadSettings();
         
-    }
+        Setting settingPin;
+        settingPin.type = STRING;
+        settingPin.string_value = pin;
+        settingPin.key = SETTING_ADMIN_PIN;
 
-    void PctrlService::setAdminPin(const std::string&) {
+        saveSetting(settings, settingPin);*/
 
+        return Ipc::Result::Ok;        
     }
 
     Ipc::Result PctrlService::verifyAdminPin(const std::string&, Ipc::Request*) {
+        /*auto settings = loadSettings();
+
+        const auto adminPin = settings[SETTING_ADMIN_PIN].string_value;
+        request->appendReplyValue(adminPin == pin ? "valid" : "invalid");
+
+        return adminPin == pin ? Ipc::Result::Ok : Ipc::Result::Error;*/
         return Ipc::Result::Ok;
     }
 
@@ -221,13 +242,21 @@ namespace alefbet::pctrl::srv {
             case Ipc::Command::GetUsersList: {
                 return getUsersList(request);
             }        
-            case Ipc::Command::GetUserData: {
+            case Ipc::Command::GetUserUsageTime: {
                 std::string username;
                 rc = request->readRequestData(username);
                 if(rc != Ipc::Result::Ok) {
-                    logToFile("[Service] Could not red request data (username)\n");                    
+                    logToFile("[Service] Could not read request data (username)\n");                    
                 }
-                return getUserData(username, request);                
+                return getUserUsageTime(username, request);                
+            }
+            case Ipc::Command::GetUserRemainingTime: {
+                std::string username;
+                rc = request->readRequestData(username);
+                if(rc != Ipc::Result::Ok) {
+                    logToFile("[Service] Could not read request data (username)\n");                    
+                }
+                return getUserRemainingTime(username, request);   
             }
             case Ipc::Command::GetRunningApplication: {
                 return getRunningApplication(request);
@@ -244,8 +273,7 @@ namespace alefbet::pctrl::srv {
                 if(rc != Ipc::Result::Ok) {
                     logToFile("[Service] Could not read request data (daily limit)\n");
                 }
-                setUserLimits(username, dailyLimitInMinutes);
-                break;
+                return setUserLimits(username, dailyLimitInMinutes);
             }
             case Ipc::Command::SetAdminPin: {
                 std::string pin;
@@ -253,8 +281,7 @@ namespace alefbet::pctrl::srv {
                 if(rc != Ipc::Result::Ok) {
                     logToFile("[Service] Could not read request data (PIN)\n");
                 }
-                setAdminPin(pin);
-                break;
+                return setAdminPin(pin);
             }
             case Ipc::Command::VerifyAdminPin: {
                 std::string pin;
@@ -275,7 +302,7 @@ namespace alefbet::pctrl::srv {
     }
     
     void PctrlService::listen() {                
-        logToFile("[Service] Start listening\n");
+        logToFile("[Service] Starting listening\n");
 
         while(true) {            
             if (!ipcServer_->process()) {
@@ -286,7 +313,7 @@ namespace alefbet::pctrl::srv {
             svcSleepThread(5'000);
         }
 
-        logToFile("[Service] Listen() will exit\n");
+        logToFile("[Service] Stopped listening\n");
     }
 
 }
