@@ -6,9 +6,11 @@
 #include <vector>
 #include <string_view>
 #include <ranges>
+#include <codecvt>
 #include "logger.h"
 
 using namespace alefbet::pctrl::logger;
+using namespace alefbet::pctrl::structs;
 
 namespace alefbet::pctrl::helpers {
     std::string titleIdToString(u64 titleId) {
@@ -34,7 +36,7 @@ namespace alefbet::pctrl::helpers {
         }
         
         if(parts.size() != 2) {
-            logToFile("[Helpers] Incorrect split of AccountUid %s.", uid_str);
+            logToFile("[Helpers] Incorrect split of AccountUid %s.\n", uid_str);
             return uid;
         }
 
@@ -44,11 +46,14 @@ namespace alefbet::pctrl::helpers {
         return uid;
     }
 
-    std::string getCurrentUser() {
+    UserData getCurrentUser() {
+        UserData user;
+
         ::Result rc = accountInitialize(AccountServiceType_Administrator);
         if(rc != 0) {
             logToFile("[Helpers] Could not initialize account service: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
-            return std::string("ERR#003");
+            user.nickname = std::string("ERR#003");
+            return user;
         }
 
         AccountUid uid;
@@ -58,10 +63,12 @@ namespace alefbet::pctrl::helpers {
         if(rc != 0) {
             logToFile("[Helpers] Could not get preselected user: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             accountExit();
-            return std::string("ERR#004");
+            user.nickname = std::string("ERR#004");
+            return user;
         }
 
         logToFile("[Helpers] user uid: %i.%i\n", uid.uid[0], uid.uid[1]);
+        user.uid = uid;
 
         AccountProfile profile;
         AccountUserData user_data;
@@ -70,7 +77,10 @@ namespace alefbet::pctrl::helpers {
         if(rc != 0) {
             logToFile("[Helpers] Could not get account profile: %i\n", rc);
             accountExit();
-            return std::string("ERR#005");
+            user.nickname = std::string("ERR#005");
+            return user;
+        } else {
+            logToFile("[Helpers] accountGetProfile() ok\n");
         }
 
         rc = accountProfileGet(&profile, &user_data, &base);
@@ -78,13 +88,19 @@ namespace alefbet::pctrl::helpers {
             logToFile("[Helpers] Could not get user data: %i\n", rc);
             accountProfileClose(&profile);
             accountExit();
-            return std::string("ERR#006");
+            user.nickname = std::string("ERR#006");
+            return user;
+        } else {
+            logToFile("[Helpers] accountProfileGet() ok\n");
         }
         
+        user.nickname = std::string(base.nickname);
+        logToFile("[Helpers] uid=%i:%i, Nickname=%s\n", user.uid.uid[0], user.uid.uid[1], user.nickname.c_str());
+
         accountProfileClose(&profile);
         accountExit();
 
-        return std::string(base.nickname);
+        return user;
     }
 
     u64 getRunningApplicationPid() {

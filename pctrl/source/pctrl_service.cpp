@@ -25,13 +25,13 @@
 #include "pctrl_screen.hpp"
 #include "ams_bpc.h"
 #include "helpers.h"
-//#include "database/settings.h"
-//#include "database/database.h"
+#include "database/settings.h"
+#include "database/database.h"
 
 //#define PSEC_DEBUG 1
 
 using namespace alefbet::pctrl::logger;
-//using namespace alefbet::pctrl::database;
+using namespace alefbet::pctrl::database;
 using namespace alefbet::pctrl::helpers;
 
 namespace alefbet::pctrl::srv {       
@@ -135,7 +135,7 @@ namespace alefbet::pctrl::srv {
 
     Ipc::Result PctrlService::getCurrentUser(Ipc::Request* request) {            
         const auto current_user = helpers::getCurrentUser();
-        request->appendReplyValue(current_user);
+        request->appendReplyValue(current_user.nickname);
 
         return Ipc::Result::Ok;
     }
@@ -145,11 +145,11 @@ namespace alefbet::pctrl::srv {
         return Ipc::Result::Ok;
     }
 
-    Ipc::Result PctrlService::getUserUsageTime(const std::string& uid, Ipc::Request*) {
+    Ipc::Result PctrlService::getUserUsageTime(const std::string& uid, Ipc::Request* request) {
         const auto uidS = accountUidFromString(uid);
         logToFile("[Service] Get remaining time for user %s\n", uidS);
 
-        /*const auto history = getHistory(uidS, today());
+        const auto history = getHistory(uidS, today());
         auto usage_time_in_minutes = (u16)0;        
 
         // Compute the total usage for today 
@@ -164,16 +164,16 @@ namespace alefbet::pctrl::srv {
 
         logToFile("[Service] User=%s, usage=%i minutes, remaining=%i minutes", uidS, usage_time_in_minutes, remaining_time_in_minutes);
 
-        request->appendReplyValue(remaining_time_in_minutes);*/
+        request->appendReplyValue(remaining_time_in_minutes);
 
         return Ipc::Result::Ok;
     }
 
-    Ipc::Result PctrlService::getUserRemainingTime(const std::string& uid, Ipc::Request* ) {
+    Ipc::Result PctrlService::getUserRemainingTime(const std::string& uid, Ipc::Request* request) {
         const auto uidS = accountUidFromString(uid);
         logToFile("[Service] Get usage time for user %s\n", uidS);
 
-        /*const auto history = getHistory(uidS, today());
+        const auto history = getHistory(uidS, today());
         auto usage_time_in_minutes = (u16)0;        
 
         // Compute the total usage for today 
@@ -183,51 +183,51 @@ namespace alefbet::pctrl::srv {
 
         logToFile("[Service] User=%s, usage=%i minutes", uidS, usage_time_in_minutes);
 
-        request->appendReplyValue(usage_time_in_minutes);*/
+        request->appendReplyValue(usage_time_in_minutes);
 
         return Ipc::Result::Ok;
     }
 
-    Ipc::Result PctrlService::setUserLimits(const std::string&, const u32& ) {
+    Ipc::Result PctrlService::setUserLimits(const std::string&, const u32& limit_in_minutes) {
         // Now the limit is global not per user so we don't use the first argument
 
-        /*auto settings = loadSettings();
+        auto settings = loadSettings();
 
         Setting setting;        
         setting.key = SETTING_DAILY_LIMIT_GLOBAL;
         setting.type = INTEGER;
-        setting.int_value = limit_in_minutes;        
+        setting.int_value = limit_in_minutes;
 
-        saveSetting(settings, setting);*/
+        saveSetting(settings, setting);
 
         return Ipc::Result::Ok;
     }
 
     Ipc::Result PctrlService::setAdminPin(const std::string& pin) {
         logToFile("[Service] Setting admin PIN to %s", pin);
-        /*auto settings = loadSettings();
+        auto settings = loadSettings();
         
         Setting settingPin;
         settingPin.type = STRING;
         settingPin.string_value = pin;
         settingPin.key = SETTING_ADMIN_PIN;
 
-        saveSetting(settings, settingPin);*/
+        saveSetting(settings, settingPin);
 
         return Ipc::Result::Ok;        
     }
 
-    Ipc::Result PctrlService::verifyAdminPin(const std::string&, Ipc::Request*) {
-        /*auto settings = loadSettings();
+    Ipc::Result PctrlService::verifyAdminPin(const std::string& pin, Ipc::Request* request) {
+        auto settings = loadSettings();
 
         const auto adminPin = settings[SETTING_ADMIN_PIN].string_value;
         request->appendReplyValue(adminPin == pin ? "valid" : "invalid");
 
-        return adminPin == pin ? Ipc::Result::Ok : Ipc::Result::Error;*/
+        return adminPin == pin ? Ipc::Result::Ok : Ipc::Result::Error;
         return Ipc::Result::Ok;
     }
 
-    Ipc::Result PctrlService::commandThread(Ipc::Request * request) {
+    Ipc::Result PctrlService::commandThread(Ipc::Request* request) {
         logToFile("[Service] request received: CmdId=%i\n", request->cmd());
         Ipc::Result rc;
 

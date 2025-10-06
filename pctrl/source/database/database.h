@@ -15,9 +15,10 @@ namespace alefbet::pctrl::database {
 
     /* Data management */
     std::vector<HistoryEntry> getHistory(AccountUid uid, std::string date);
-    HistoryEntry addToHistory(AccountUid uid, u64 titleId, u32 duration_in_minutes);
+    HistoryEntry addToHistory(AccountUid uid, u64 titleId, u16 duration_in_minutes);
 
     /* Settings management */
     Settings loadSettings();
-    void saveSetting(Settings& settings, Setting& setting);
+    void saveSettings(Settings& settings);
+    void saveSetting(Settings& settings, Setting setting);
 }

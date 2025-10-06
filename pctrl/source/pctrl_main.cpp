@@ -18,7 +18,7 @@
 #include <thread>
 #include "pctrl_service.hpp"
 #include "pctrl_screen.hpp"
-//#include "pctrl_monitor.h"
+#include "pctrl_monitor.h"
 #include "logger.h"
 
 using namespace ams;
@@ -30,13 +30,21 @@ extern "C" {
     //u32 __nx_nv_transfermem_size = 0x40000;
     //ViLayerFlags __nx_vi_stray_layer_flags = (ViLayerFlags)0;
 
-    constexpr size_t ServiceThreadStackRequiredSizeBytes = util::AlignUp(256_KB, 128);
-    constexpr size_t ServiceThreadStackRequiredSizeAligned = util::AlignUp(ServiceThreadStackRequiredSizeBytes, os::MemoryHeapUnitSize);
+    constexpr size_t TotalHeapSize = util::AlignUp(2_MB, os::MemoryHeapUnitSize);
+
+    constexpr size_t ThreadServiceStackRequiredSizeBytes = util::AlignUp(256_KB, 128);
+    constexpr size_t ThreadServiceStackRequiredSizeAligned = util::AlignUp(ThreadServiceStackRequiredSizeBytes, os::MemoryPageSize);
+
+    constexpr size_t ThreadMonitorStackRequiredSizeBytes = util::AlignUp(256_KB, 128);
+    constexpr size_t ThreadMonitorStackRequiredSizeAligned = util::AlignUp(ThreadMonitorStackRequiredSizeBytes, os::MemoryPageSize);
     
-    constexpr size_t MonitorThreadStackRequiredSizeBytes = util::AlignUp(128_KB, 128);
-    constexpr size_t MonitorThreadStackRequiredSizeAligned = util::AlignUp(MonitorThreadStackRequiredSizeBytes, os::MemoryHeapUnitSize);
-    
+    //constinit u8 *g_stack_pointer_service = nullptr;
+    //constinit u8 *g_stack_pointer_monitor = nullptr;
     constinit u8 *g_heap_pointer = nullptr;
+    //constinit u8 g_thread_service_memory[ThreadStackRequiredSizeAligned];
+
+    alignas(os::MemoryPageSize) constinit u8 g_thread_service_memory[ThreadServiceStackRequiredSizeAligned];
+    alignas(os::MemoryPageSize) constinit u8 g_thread_monitor_memory[ThreadMonitorStackRequiredSizeAligned];
 }
 
 namespace alefbet {
@@ -60,15 +68,53 @@ namespace alefbet {
             void InitializeFsHeap() {
                 g_fs_heap_handle = lmem::CreateExpHeap(g_fs_heap_memory, sizeof(g_fs_heap_memory), lmem::CreateOption_ThreadSafe);
             }
+            
+            //lmem::HeapHandle g_thread_service_memory_handle;
 
-            void AllocateStackForThreads() {
-                logToFile("Allocate stack for threads\n");
-                ams::Result rc = os::SetMemoryHeapSize(ServiceThreadStackRequiredSizeAligned /*+ MonitorThreadStackRequiredSizeAligned*/);
+            void SetupMemory() {
+                uintptr_t heap_base = os::GetMemoryHeapAddress();
+                size_t heap_size = os::GetMemoryHeapSize();
+
+                logToFile("Memory heap of size %i at address %p\n", heap_size, heap_base);  
+                logToFile("Current allocator is at %p\n", init::GetAllocator());
+
+                // Initialize heap
+                if(heap_size == 0) {
+                    logToFile("Allocate heap of size %i\n", TotalHeapSize);      
+                    ams::Result rc = os::SetMemoryHeapSize(TotalHeapSize);
+
+                    if (rc.IsSuccess()) {                        
+                        g_heap_pointer = reinterpret_cast<u8 *>(os::GetMemoryHeapAddress());
+                        heap_base = os::GetMemoryHeapAddress();
+                        heap_size = os::GetMemoryHeapSize();                                          
+                    } else {
+                        logToFile("Could not set heap size to %i\n", TotalHeapSize);
+                    }                    
+                }
+
+                logToFile("Memory heap of size %i at address %p\n", heap_size, heap_base);  
+                
+                /*logToFile("Allocate stack for thread service\n");
+                g_thread_service_memory_handle = lmem::CreateExpHeap(g_thread_service_memory, ThreadStackRequiredSizeAligned, lmem::CreateOption_ThreadSafe);
+                if(g_thread_service_memory_handle->heap_start != nullptr) {
+                    logToFile("Stack for thread service allocated at %p with size %i\n", g_thread_service_memory_handle, ThreadStackRequiredSizeAligned);
+                }*/                
+
+                logToFile("Verify stack alignement=%i\n", (uintptr_t)g_thread_service_memory & 0xFFF);
+                //logToFile("Verify 2=%i\n", (uintptr_t)g_thread_service_memory_handle->heap_start & 0xFFF);
+
+                /*ams::Result res = os::AllocateMemoryBlock((uintptr_t*)g_stack_pointer_service, MonitorThreadStackRequiredSizeAligned);
+                if(res.IsFailure()) {
+                    logToFile("Memory allocation of size %i failed\n", MonitorThreadStackRequiredSizeAligned);
+                }*/
+
+                /*logToFile("Allocate stack for thread Monitor\n");
+                ams::Result rc = os::SetMemoryHeapSize(MonitorThreadStackRequiredSizeAligned);
                 if (rc.IsSuccess()) {
-                    g_heap_pointer = reinterpret_cast<u8 *>(os::GetMemoryHeapAddress());
+                    g_stack_pointer_monitor = reinterpret_cast<u8 *>(os::GetMemoryHeapAddress());
                     return;
                 }
-                logToFile("Stack allocated for threads\n");
+                logToFile("Stack allocated for thread Monitor\n");*/
             }
 
         }
@@ -77,19 +123,17 @@ namespace alefbet {
 
 namespace ams {
     namespace init {
-        constexpr size_t MallocBufferSize = 128_KB;
+        constexpr size_t MallocBufferSize = TotalHeapSize;
         alignas(os::MemoryPageSize) constinit u8 g_malloc_buffer[MallocBufferSize];
 
-        //void InitializeSystemModuleBeforeConstructors() {
+        void InitializeSystemModuleBeforeConstructors() {
             /* Catch has global-ctors which allocate, so we need to do this earlier than normal. */
-            
-        //}        
-
-        void InitializeSystemModule() {
-            /* Initialize heap. */
-            alefbet::pctrl::srv::InitializeFsHeap();
-            //TODO: useful?
             init::InitializeAllocator(g_malloc_buffer, sizeof(g_malloc_buffer));
+        }        
+
+        void InitializeSystemModule() {                        
+            //TODO: useful?            
+            alefbet::pctrl::srv::InitializeFsHeap();
             
             /* Initialize our connection to sm. */
             sm::Initialize();
@@ -130,10 +174,10 @@ namespace ams {
         srv->listen();            
     }
 
-    /*void startMonitor(void* monitor) {
+    void startMonitor(void* monitor) {
         alefbet::pctrl::srv::Monitor* mon = static_cast<alefbet::pctrl::srv::Monitor*>(monitor);
         mon->start();
-    }*/
+    }
 
     void Main() {                
         alefbet::pctrl::logger::clearLog();
@@ -142,7 +186,14 @@ namespace ams {
         /* Set thread name. */
         os::SetThreadNamePointer(os::GetCurrentThread(), "alefbet.pctrl.Main");        
 
-        alefbet::pctrl::srv::AllocateStackForThreads();
+        //alefbet::pctrl::srv::AllocateHeapForThreads();
+        //alefbet::pctrl::srv::AllocateStackForThreads();
+        alefbet::pctrl::srv::SetupMemory();
+
+        int on_stack = 0;
+        int* on_heap = new int(0);
+        logToFile("@on_stack=%p\n", &on_stack);
+        logToFile("@on_heap=%p\n", (void*)on_heap);        
 
         ::Result rc = 0;
 
@@ -162,46 +213,52 @@ namespace ams {
         }*/
 
         // Loop processing the IPC server.        
-        Ipc::Server ipcServer("pctrl");        
-        alefbet::pctrl::srv::PctrlService service(&ipcServer/*, g_heap_pointer*/);
+        Ipc::Server* ipcServer = new Ipc::Server("pctrl");
+        logToFile("@ipcServer=%p\n", (void*)ipcServer);
+        alefbet::pctrl::srv::PctrlService* service = new alefbet::pctrl::srv::PctrlService(ipcServer/*, g_heap_pointer*/);
+        logToFile("@service=%p\n", (void*)service);
         
         Thread threadIpc;
         //TODO: replace heap with malloc buffer?
-        rc = threadCreate(&threadIpc, startIpc, &service, g_heap_pointer, ServiceThreadStackRequiredSizeBytes, 0x2c, -2);        
+        rc = threadCreate(&threadIpc, startIpc, service, g_thread_service_memory, ThreadServiceStackRequiredSizeAligned, 0x2c, -2);        
+        //rc = threadCreate(&threadIpc, startIpc, &service, NULL, 0, 0x2c, -2);        
         if(R_FAILED(rc)) {
-            logToFile("Could not create the service thread, error %i.\n", rc);
+            logToFile("Could not create the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return;
         }
         rc = threadStart(&threadIpc);
         if(R_FAILED(rc)) {
-            logToFile("Could not start the service thread, error %i.\n", rc);
+            logToFile("Could not start the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return;
         }
 
-        /*Thread threadMonitor;
-        alefbet::pctrl::srv::Monitor monitor;
-        rc = threadCreate(&threadMonitor, startMonitor, &monitor, g_heap_pointer, MonitorThreadStackRequiredSizeBytes, 0x2c, -2);
+        Thread threadMonitor;
+        alefbet::pctrl::srv::Monitor* monitor = new alefbet::pctrl::srv::Monitor();
+        rc = threadCreate(&threadMonitor, startMonitor, monitor, g_thread_monitor_memory, ThreadMonitorStackRequiredSizeAligned, 0x2c, -2);
         if(R_FAILED(rc)) {
-            logToFile("Could not create the monitor thread, error %i.\n", rc);
+            logToFile("Could not create the monitor thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return;
         }
         rc = threadStart(&threadMonitor);
         if(R_FAILED(rc)) {
-            logToFile("Could not start the monitor thread, error %i.\n", rc);
-            return;
-        }*/
-
-        rc = threadWaitForExit(&threadIpc);
-        if(R_FAILED(rc)) {
-            logToFile("Could not wait for the service thread to end, error %i.\n", rc);
+            logToFile("Could not start the monitor thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return;
         }
 
-        /*rc = threadWaitForExit(&threadMonitor);
+        rc = threadWaitForExit(&threadIpc);
         if(R_FAILED(rc)) {
-            logToFile("Could not wait for the monitor thread to end, error %i.\n", rc);
+            logToFile("Could not wait for the service thread to end, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return;
-        }*/
+        }
+
+        rc = threadWaitForExit(&threadMonitor);
+        if(R_FAILED(rc)) {
+            logToFile("Could not wait for the monitor thread to end, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
+            return;
+        }
+
+        delete monitor;
+        delete service;
 
         logToFile("Parental control ended\n");
     }

@@ -1,7 +1,42 @@
 Parental control starting
-Allocate stack for threads
+Memory heap of size 0 at address (nil)
+Current allocator is at 0x1747dbd0f0
+Allocate heap of size 2097152
+Memory heap of size 2097152 at address 0x34ffc00000
+Verify stack alignement=0
+@on_stack=0x32761d4f7c
+@on_heap=0x1747adf000
 [IPC] Server started
+@ipcServer=0x1747ae0000
 [Service] Starting service
 [Service] service started
 [Service] Shared font loaded
+@service=0x1747ae1000
 [Service] Starting listening
+[Monitor] Starting monitoring
+Update usages
+[Helpers] Could not get application process ID: 15:1
+[Helpers] Could not get the title ID for the process 15:1
+No title running
+Update usages
+[Helpers] process ID=137
+[Helpers] title formatted ID=010043500A17A000, ID=169320448, pid=137
+[Helpers] user uid: 0.0
+[Helpers] Could not get account profile: 1546
+No user found
+Update usages
+[Helpers] process ID=137
+[Helpers] title formatted ID=010043500A17A000, ID=169320448, pid=137
+[Helpers] user uid: -412094135.-399940166
+[Helpers] accountGetProfile() ok
+[Helpers] accountProfileGet() ok
+[Helpers] uid=-412094135:-399940166, Nickname=Papa
+Title 169320448 is currently in used by Papa. Updating history.
+[Database] Opening database at sdmc:/switch/parental_control/sessions.json
+[Database] Error: Could not load database.
+[Database] no entry found for user 1155462797689090377:2253595715205424570 with title ID 169320448
+[Database] Loading settings at sdmc:/switch/parental_control/settings.json
+Could not open settings file. Initialise default settings.
+[Database] The settings file could not be opened for writing
+[Database] The settings file could not be opened for writing
+[Monitor] Remaining time for user Papa is 61951 minutes.
