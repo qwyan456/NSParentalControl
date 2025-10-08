@@ -44,3 +44,7 @@
 build/
 out/
 build.nosync/
+*.elf
+*.ovl
+*.nacp
+*.log
