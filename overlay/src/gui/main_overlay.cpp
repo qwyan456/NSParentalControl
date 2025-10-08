@@ -7,7 +7,7 @@ MainOverlay::MainOverlay() {
 }
 
 std::unique_ptr<tsl::Gui> MainOverlay::loadInitialGui() {
-    return initially<MainMenu>(); 
+    return initially<MainMenuPanel>(); 
 }
 
 /*void BlockerOverlay::onShow() { 

@@ -8,7 +8,8 @@ namespace Ipc {
         GetUsersList,       /*! Queries the current users list. Returns a list of strings containing the users names registered on the system. */
         GetUserUsageTime,   /*! Queries a user's usage data. Returns a data structure with the information of the user. */
         GetUserRemainingTime,
-        GetCurrentUser,     /*! Returns the current profile. */
+        GetCurrentUserUid,     /*! Returns the current profile. */
+        GetCurrentUserNickname,     /*! Returns the current profile. */
         GetRunningApplication,
         SetUserLimits,      /*! Sets a users limits. */
         SetAdminPin,        /*! Sets the administrator PIN. */

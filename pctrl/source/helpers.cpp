@@ -11,6 +11,7 @@
 
 using namespace alefbet::pctrl::logger;
 using namespace alefbet::pctrl::structs;
+using std::operator""sv;
 
 namespace alefbet::pctrl::helpers {
     std::string titleIdToString(u64 titleId) {
@@ -23,20 +24,20 @@ namespace alefbet::pctrl::helpers {
         return ss.str();
     }
 
-    std::string accountUidToString(AccountUid uid) {
+    UserUid accountUidToString(AccountUid uid) {
         return std::to_string(uid.uid[0]) + ":" + std::to_string(uid.uid[1]);
     }
 
-    AccountUid accountUidFromString(const std::string& uid_str) {
+    AccountUid accountUidFromString(const UserUid& uid_str) {
         AccountUid uid;
 
         std::vector<std::string> parts;
-        for (const auto part : std::views::split(uid_str, ":")) {
+        for (const auto part : std::views::split(uid_str, ":"sv)) {
             parts.push_back(std::string(part.begin(), part.end()));
         }
         
         if(parts.size() != 2) {
-            logToFile("[Helpers] Incorrect split of AccountUid %s.\n", uid_str);
+            logToFile("[Helpers] Incorrect split of AccountUid %s.\n", uid_str.c_str());
             return uid;
         }
 
@@ -52,7 +53,7 @@ namespace alefbet::pctrl::helpers {
         ::Result rc = accountInitialize(AccountServiceType_Administrator);
         if(rc != 0) {
             logToFile("[Helpers] Could not initialize account service: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
-            user.nickname = std::string("ERR#003");
+            user.nickname = UserNickname("ERR#003");
             return user;
         }
 
@@ -63,7 +64,7 @@ namespace alefbet::pctrl::helpers {
         if(rc != 0) {
             logToFile("[Helpers] Could not get preselected user: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             accountExit();
-            user.nickname = std::string("ERR#004");
+            user.nickname = UserNickname("ERR#004");
             return user;
         }
 
@@ -77,7 +78,7 @@ namespace alefbet::pctrl::helpers {
         if(rc != 0) {
             logToFile("[Helpers] Could not get account profile: %i\n", rc);
             accountExit();
-            user.nickname = std::string("ERR#005");
+            user.nickname = UserNickname("ERR#005");
             return user;
         } else {
             logToFile("[Helpers] accountGetProfile() ok\n");
@@ -88,13 +89,13 @@ namespace alefbet::pctrl::helpers {
             logToFile("[Helpers] Could not get user data: %i\n", rc);
             accountProfileClose(&profile);
             accountExit();
-            user.nickname = std::string("ERR#006");
+            user.nickname = UserNickname("ERR#006");
             return user;
         } else {
             logToFile("[Helpers] accountProfileGet() ok\n");
         }
         
-        user.nickname = std::string(base.nickname);
+        user.nickname = UserNickname(base.nickname);
         logToFile("[Helpers] uid=%i:%i, Nickname=%s\n", user.uid.uid[0], user.uid.uid[1], user.nickname.c_str());
 
         accountProfileClose(&profile);
@@ -145,12 +146,35 @@ namespace alefbet::pctrl::helpers {
         return std::string(buffer.nacp.lang[0].name);
     }
 
-    std::string today() {
-        std::time_t t = std::time(nullptr);
-        std::tm tm{};
-        localtime_r(&t, &tm);
-        std::ostringstream oss;
-        oss << std::put_time(&tm, "%Y%m%d");
-        return oss.str();
+    std::string today() {        
+        ::Result rc = timeInitialize();
+        if(R_FAILED(rc)) {
+            logToFile("[Helpers] Could not connect to time service\n");
+            return "";
+        }
+
+        u64 ts;
+        TimeCalendarTime time;
+        TimeCalendarAdditionalInfo info;
+        rc = timeGetCurrentTime(TimeType_LocalSystemClock, &ts);        
+        if(R_FAILED(rc)) {
+            logToFile("[Helpers] Could not get current time (err %i:%i)\n", R_MODULE(rc), R_DESCRIPTION(rc));
+            return "";
+        }
+
+        rc = timeToCalendarTimeWithMyRule(ts, &time, &info);
+        if(R_FAILED(rc)) {
+            logToFile("[Helpers] Could not convert timestamp\n");
+            return "";
+        }
+        
+        char buffer[9];
+        std::snprintf(buffer, sizeof(buffer), "%04d%02d%02d",
+            time.year,
+            time.month,
+            time.day
+        );
+
+        return std::string(buffer);
     }
 }

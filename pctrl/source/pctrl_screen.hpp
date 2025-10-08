@@ -41,8 +41,7 @@ namespace alefbet::pctrl::srv {
 
         public:            
             ::Result ShowScreenTimeout();
-            void HideScreen();
-            void setHeapPointer(u8* heap_pointer);
+            void HideScreen();            
 
         private:
             ViDisplay m_display;

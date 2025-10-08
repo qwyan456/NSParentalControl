@@ -6,35 +6,36 @@
 #include "Command.hpp"
 #include "panel_debug_menu.h"
 #include "panel_setup_menu.h"
+#include "panel_verifypin.h"
 #include "AppContext.h"
-#include "helpers.h"
+#include "helpers/ipc_helpers.h"
 
 using namespace alefbet::pctrl;
 
-MainMenu::MainMenu() {    
+MainMenuPanel::MainMenuPanel() {    
 }
 
-MainMenu::~MainMenu() {      
+MainMenuPanel::~MainMenuPanel() {      
 }
 
-void MainMenu::closeAndClean() {
+void MainMenuPanel::closeAndClean() {
 }
 
-bool MainMenu::isParentalControlInitialized() { 
+bool MainMenuPanel::isParentalControlInitialized() { 
     return true;
 }
 
-bool MainMenu::isParentalControlActive() {
+bool MainMenuPanel::isParentalControlActive() {
     return getAppContext().is_ready;
 }
 
-std::list<std::string> MainMenu::getUsersList() {
+std::list<std::string> MainMenuPanel::getUsersList() {
     std::list<std::string> users;
 
     return users;
 }
 
-tsl::elm::Element* MainMenu::createUI() {
+tsl::elm::Element* MainMenuPanel::createUI() {
     std::string subTitle = "Parental Control is not initialized";
     if(isParentalControlInitialized()) {
         subTitle = isParentalControlActive() ? "Parental Control is Ready" : "Parental Control is not Ready";
@@ -51,7 +52,7 @@ tsl::elm::Element* MainMenu::createUI() {
 }
 
 
-void MainMenu::rebuildUI() {
+void MainMenuPanel::rebuildUI() {
 
     if(!isParentalControlInitialized()) {
         auto entryInitialize = new tsl::elm::ListItem("Initialize Parental Control");        
@@ -80,11 +81,20 @@ void MainMenu::rebuildUI() {
         }*/
 
         // Current User
-        auto currentUser = ipc::getCurrentUser();        
         auto currentTitle = ipc::getCurrentTitle();
+        logToFile("title=");
+        logToFile(currentTitle.c_str());
 
-        if(!currentUser.empty() && !currentTitle.empty()) {
-            auto entryUser = new tsl::elm::ListItem("User: " +currentUser);
+        if(!currentTitle.empty()) {
+            auto currentUserUid = ipc::getCurrentUserUid();
+            logToFile("user id=");
+            logToFile(currentUserUid.c_str());
+
+            auto currentUserNickname = ipc::getCurrentUserNickname();        
+            logToFile("user name=");
+            logToFile(currentUserNickname.c_str());        
+
+            auto entryUser = new tsl::elm::ListItem("User: " +currentUserNickname);
             rootList_->addItem(entryUser);
             
             // Current game        
@@ -92,12 +102,12 @@ void MainMenu::rebuildUI() {
             rootList_->addItem(entryTitle);
 
             // Usage time        
-            auto usageTime = ipc::getUserUsageTime(currentUser);        
+            auto usageTime = ipc::getUserUsageTime();        
             auto entryUsageTime = new tsl::elm::ListItem("Usage: " +std::to_string(usageTime) +" mn");
             rootList_->addItem(entryUsageTime);
 
             // Remaining time
-            auto remainingTime = ipc::getUserRemainingTime(currentUser);
+            auto remainingTime = ipc::getUserRemainingTime();
             auto entryRemainingTime = new tsl::elm::ListItem("Remaining: " +std::to_string(remainingTime) +" mn");
             rootList_->addItem(entryRemainingTime);
 
@@ -122,26 +132,26 @@ void MainMenu::rebuildUI() {
         rootList_->addItem(entrySetupMenu);        
         entrySetupMenu->setClickListener([this](u64 keys) {
             if(keys & HidNpadButton_A) {
-                tsl::changeTo<SetupMenu>();
+                tsl::changeTo<VerifyPinPanel, NextPanel>(PanelSetupMenu);
                 return true;
             }
 
             return false;
         });
 
-    }
+    } 
 
     rootFrame_->setContent(rootList_);
 }
 
-void MainMenu::update() {
+void MainMenuPanel::update() {
     
 }
 
 // Called once every frame to handle inputs not handled by other UI elements
-bool MainMenu::handleInput(u64 keysDown, u64 keysHeld, const HidTouchState &touchPos, HidAnalogStickState joyStickPosLeft, HidAnalogStickState joyStickPosRight) {
+bool MainMenuPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouchState &touchPos, HidAnalogStickState joyStickPosLeft, HidAnalogStickState joyStickPosRight) {
     if (keysDown & HidNpadButton_B) {
-        tsl::goBack();
+        tsl::Overlay::get()->close();
         return true;
     }
 

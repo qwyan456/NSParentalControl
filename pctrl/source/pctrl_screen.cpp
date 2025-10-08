@@ -72,24 +72,7 @@ namespace alefbet::pctrl::srv {
         return tmp_pos / 2;
     }
 
-    void GuiController::setHeapPointer(u8* heap_pointer) {
-        logToFile("[Screen] Setting heap pointer to @%p\n", heap_pointer_);
-        heap_pointer_ = heap_pointer;
-    }
-
     void GuiController::InitializeFrameBufferPointer() {
-        // Try to get a framebuffer from heap.
-        /*{
-            logToFile("[Screen] sboub 1\n");
-            if (R_SUCCEEDED(os::SetMemoryHeapSize(FrameBufferRequiredSizeHeapAligned))) {                        
-                g_framebuffer_pointer = reinterpret_cast<u8 *>(os::GetMemoryHeapAddress());
-                logToFile("[Screen] g_framebuffer_pointer initialized on heap @%p\n", g_framebuffer_pointer);
-                return;            
-            }
-
-            logToFile("[Screen] SetMemoryHeapSize failed\n");
-        }*/
-
         if(heap_pointer_ != nullptr) {
             g_framebuffer_pointer = heap_pointer_;
             logToFile("[Screen] g_framebuffer_pointer points to heap_pointer\n");
@@ -136,7 +119,7 @@ namespace alefbet::pctrl::srv {
         ::Result res = viOpenDisplay("Internal", std::addressof(temp_display));
         if(res != 0) {
             // Do not overreact
-            logToFile("Could not open internal display\n");
+            logToFile("[Screen] Could not open internal display\n");
             // but fail...
             return res;
         }
@@ -148,18 +131,18 @@ namespace alefbet::pctrl::srv {
         if (hos::GetVersion() >= hos::Version_3_0_0) {
             viSetDisplayPowerState(std::addressof(temp_display), ViPowerState_On);
             // Best effort
-            logToFile("Turn the screen on the regular way\n");
+            logToFile("[Screen] Turn the screen on the regular way\n");
         } else {
             /* Prior to 3.0.0, the ViPowerState enum was different (0 = Off, 1 = On). */
             viSetDisplayPowerState(std::addressof(temp_display), ViPowerState_On_Deprecated);
             // Best effort
-            logToFile("Turn the screen on the old way\n");
+            logToFile("[Screen] Turn the screen on the old way\n");
         }
 
         /* Set alpha to 1.0f. */
         res = viSetDisplayAlpha(std::addressof(temp_display), 1.0f);
         if(res != 0) {
-            logToFile("Could not set internal display alpha\n");
+            logToFile("[Screen] Could not set internal display alpha\n");
         }
 
         return 0;
@@ -171,7 +154,7 @@ namespace alefbet::pctrl::srv {
         ::Result res = viOpenDisplay("External", std::addressof(temp_display));
         if(res != 0) {
             // Do not overreact
-            logToFile("Could not open external display\n");
+            logToFile("[Screen] Could not open external display\n");
             // but fail...
             return res;
         }
@@ -182,7 +165,7 @@ namespace alefbet::pctrl::srv {
         /* Set alpha to 1.0f. */
         res = viSetDisplayAlpha(std::addressof(temp_display), 1.0f);
         if(res != 0) {
-            logToFile("Could not set external display alpha\n");
+            logToFile("[Screen] Could not set external display alpha\n");
         }
 
         return 0;
@@ -192,7 +175,7 @@ namespace alefbet::pctrl::srv {
         /* Connect to vi. */
         ::Result res = viInitialize(ViServiceType_Manager);
         if(res != 0) {
-            logToFile("Could not initialise VI service\n");
+            logToFile("[Screen] Could not initialise VI service\n");
             return res; //Fail
         }
 
@@ -207,28 +190,28 @@ namespace alefbet::pctrl::srv {
         /* Open the default display. */
         TRY_AND_RETURN(
             viOpenDefaultDisplay(std::addressof(m_display)), 
-            "Could not open default display. Aborting.\n"
+            "[Screen] Could not open default display. Aborting.\n"
         )
 
         /* Reset the display magnification to its default value. */
         s32 display_width, display_height;
         TRY_AND_RETURN(
             viGetDisplayLogicalResolution(std::addressof(m_display), std::addressof(display_width), std::addressof(display_height)),
-            "Could not get display logical resolution.\n"
+            "[Screen] Could not get display logical resolution.\n"
         )
 
         /* viSetDisplayMagnification was added in 3.0.0. */
         if (hos::GetVersion() >= hos::Version_3_0_0) {
             TRY_AND_RETURN(
                 viSetDisplayMagnification(std::addressof(m_display), 0, 0, display_width, display_height),
-                "Could not reset display magnification.\n"
+                "[Screen] Could not reset display magnification.\n"
             )
         }
 
         /* Create layer to draw to. */
         TRY_AND_RETURN(
             viCreateLayer(std::addressof(m_display), std::addressof(m_layer)),
-            "Could not create layer.\n"
+            "[Screen] Could not create layer.\n"
         )
 
         /* Setup the layer. */
@@ -246,30 +229,30 @@ namespace alefbet::pctrl::srv {
 
             TRY_AND_RETURN(
                 viSetLayerSize(std::addressof(m_layer), LayerWidth, LayerHeight),
-                "Could not set layer size.\n"
+                "[Screen] Could not set layer size.\n"
             )
 
             /* Set the layer's Z at display maximum, to be above everything else .*/
             TRY_AND_RETURN(
                 viSetLayerZ(std::addressof(m_layer), PctrlLayerZ),
-                "Could not set layer z position.\n"
+                "[Screen] Could not set layer z position.\n"
             )
 
             /* Center the layer in the screen. */
             TRY_AND_RETURN(
                 viSetLayerPosition(std::addressof(m_layer), layer_x, layer_y),
-                "Could not set layer position.\n"
+                "[Screen] Could not set layer position.\n"
             )
 
             /* Create framebuffer. */
             TRY_AND_RETURN(
                 nwindowCreateFromLayer(std::addressof(m_win), std::addressof(m_layer)),
-                "Could not create nwindow from layer.\n"
+                "[Screen] Could not create nwindow from layer.\n"
             )
 
             TRY_AND_RETURN(
                 InitializeNativeWindow(),
-                "Could not initialize native window.\n"
+                "[Screen] Could not initialize native window.\n"
             )
         }
 
@@ -320,23 +303,23 @@ namespace alefbet::pctrl::srv {
         //* Setup nv driver. */
         TRY_AND_RETURN(
             nvInitialize(),
-            "Could not initialize NV service\n"
+            "[Screen] Could not initialize NV service\n"
         )
 
         TRY_AND_RETURN(
             nvMapInit(),
-            "Could not init Map\n"
+            "[Screen] Could not init Map\n"
         )
 
         TRY_AND_RETURN(
             nvFenceInit(),
-            "Could not init fence\n"
+            "[Screen] Could not init fence\n"
         )
 
         /* Create nvmap. */
         TRY_AND_RETURN(
             nvMapCreate(std::addressof(m_map), g_framebuffer_pointer, FrameBufferRequiredSizeBytes, 0x20000, NvKind_Pitch, true),
-            "Could not create Map\n"
+            "[Screen] Could not create Map\n"
         )
 
         /* Setup graphics buffer. */
@@ -365,7 +348,7 @@ namespace alefbet::pctrl::srv {
 
             TRY_AND_RETURN(
                 nwindowConfigureBuffer(std::addressof(m_win), 0, std::addressof(grbuf)),
-                "Could not configure nwindow buffer\n"
+                "[Screen] Could not configure nwindow buffer\n"
             )
         }
 
@@ -378,7 +361,7 @@ namespace alefbet::pctrl::srv {
         logToFile("[Screen] Before nwindowDequeueBuffer\n");
         ::Result res = nwindowDequeueBuffer(std::addressof(m_win), std::addressof(slot), nullptr);
         if(res != 0) {
-            logToFile("Could not dequeue buffer for nwindow\n");
+            logToFile("[Screen] Could not dequeue buffer for nwindow\n");
             return;
         }
 
@@ -410,6 +393,7 @@ namespace alefbet::pctrl::srv {
     void GuiController::HideScreen() {
         logToFile("[Screen] Hide any screen\n");
         nwindowClose(std::addressof(m_win));
+        viSetContentVisibility(true);
         //viCloseLayer(&m_layer);
         //viSetLayerZ(&m_layer, 0);
     }

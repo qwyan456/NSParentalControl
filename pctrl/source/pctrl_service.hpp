@@ -34,18 +34,19 @@ namespace alefbet::pctrl::srv {
 
         private:
             //void process();
-            Ipc::Result commandThread(Ipc::Request * request);
+            Ipc::Result commandThread(Ipc::Request*);
 
             // Handlers
             void showScreenTimeout();
-            Ipc::Result getRunningApplication(Ipc::Request* request);
-            Ipc::Result getCurrentUser(Ipc::Request* request);
+            Ipc::Result getRunningApplication(Ipc::Request*);
+            Ipc::Result getCurrentUserUid(Ipc::Request*);
+            Ipc::Result getCurrentUserNickname(Ipc::Request*);
             Ipc::Result getUsersList(Ipc::Request*);
-            Ipc::Result getUserUsageTime(const std::string&, Ipc::Request*);
-            Ipc::Result getUserRemainingTime(const std::string&, Ipc::Request*);
-            Ipc::Result setUserLimits(const std::string&, const u32&);
+            Ipc::Result getUserUsageTime(Ipc::Request*);
+            Ipc::Result getUserRemainingTime(Ipc::Request*);
+            Ipc::Result setUserLimits(const u32&);
             Ipc::Result setAdminPin(const std::string&);
-            Ipc::Result verifyAdminPin(const std::string&, Ipc::Request*);
+            Ipc::Result verifyAdminPin(Ipc::Request*);
 
         private:
             bool is_ready_ = false;

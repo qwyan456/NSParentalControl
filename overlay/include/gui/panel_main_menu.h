@@ -3,10 +3,10 @@
 #include "switch.h"
 #include "tesla.hpp"
 
-class MainMenu : public tsl::Gui {
+class MainMenuPanel : public tsl::Gui {
 public:
-    MainMenu();
-    ~MainMenu();
+    MainMenuPanel();
+    ~MainMenuPanel();
 
     tsl::elm::Element* createUI() override;
     void rebuildUI();

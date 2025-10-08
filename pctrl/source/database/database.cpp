@@ -26,7 +26,8 @@ const std::string SETTINGS_FILENAME = DATA_DIR + "/settings.json";
 namespace alefbet::pctrl::database {
     static FileHandle handle_settings;
     static std::mutex mutex_settings;
-    //static FileHandle handle_database;
+    static FileHandle handle_database;
+    static std::mutex mutex_database;
 
     bool dataDirectoryExists()
     {
@@ -69,17 +70,59 @@ namespace alefbet::pctrl::database {
     }
 
     History loadDatabase()
-    {    
+    {            
+        std::lock_guard<std::mutex> lock(mutex_database);
+
+        logToFile("[Database] Loading database at %s\n", DB_FILENAME.c_str());
+
+        bool opened = OpenFile(std::addressof(handle_database), DB_FILENAME.c_str(), OpenMode_Read).IsSuccess();        
         History history;
 
-        logToFile("[Database] Opening database at %s\n", DB_FILENAME.c_str());
-        std::ifstream ifs(DB_FILENAME, std::ios::in); 
-        //if (!in) return history;
+        if(!opened) {
+            logToFile("Could not open database file. Try to create a new file.\n");
+            if(CreateFile(DB_FILENAME.c_str(), 0).IsFailure()) {
+                logToFile("[Database] Could not create a new database file.\n");
+                return history;
+            }
+        } else {
+            s64 fileSize = 0;
+            if(GetFileSize(&fileSize, handle_database).IsFailure()) {
+                logToFile("[Database] Could not get database file size\n");
+                CloseFile(handle_database);
+                return history;
+            } else {
+                logToFile("[Database] Database file size is %i\n", fileSize);
+            }
 
-        if (ifs.is_open()) {
-            json j_data = json::parse(ifs);
+            if(fileSize == 0) {
+                logToFile("[Database] Database file is empty\n");
+                CloseFile(handle_database);
+                return history;
+            }
 
-            std::vector<json> j_entries = j_data["history"].get<std::vector<json>>();
+            u8* data_sessions = new u8[fileSize+1];            
+            if(data_sessions == nullptr) {
+                logToFile("[Database] Could not create a buffer for sessions\n");
+                CloseFile(handle_database);
+                return history;
+            } else {
+                logToFile("[Database] sessions buffer ready at @%p\n", (void*)data_sessions);
+            }
+
+            if(ReadFile(handle_database, 0, data_sessions, fileSize).IsFailure()) {
+                logToFile("[Database] Could not read the database file\n");
+                CloseFile(handle_database);
+                return history;
+            } else {
+                logToFile("[Database] Sessions database read\n");
+            }
+
+            data_sessions[fileSize] = '\0';
+            logToFile("[Database] Sessions data: %s\n", data_sessions);
+            logToFile("[Database] Parse sessions file\n");
+            json j_settings = json::parse(data_sessions);
+
+            std::vector<json> j_entries = j_settings["history"].get<std::vector<json>>();
 
             for(const auto& j_entry: j_entries) {
                 auto uidAsString = j_entry["uid"].get<std::string>();
@@ -89,18 +132,18 @@ namespace alefbet::pctrl::database {
                 auto uid = accountUidFromString(uidAsString);
 
                 HistoryEntry entry(uid, date, titleId, durationInMinutes);
+                history.addEntry(entry);
             }
-        } else {
-            logToFile("[Database] Error: Could not load database.\n");
-        }
 
-        ifs.close();
+            CloseFile(handle_database);
+            delete[] data_sessions;
+        }
 
         return history;
     }
 
-    void saveDatabase(const History& history) {
-        std::ofstream ofs(DB_FILENAME, std::ios::out);
+    void saveDatabase(const History& history) {       
+        std::lock_guard<std::mutex> lock(mutex_database);
 
         json j_entries;
         for(const auto& entry: history.entries()) {
@@ -118,9 +161,31 @@ namespace alefbet::pctrl::database {
             { "history", j_entries }
         };
 
-        ofs << j_history.dump();
+        if(DeleteFile(DB_FILENAME.c_str()).IsFailure()) {
+            logToFile("[Database] Could not delete the current database file\n");            
+        }
 
-        ofs.close();
+        if(CreateFile(DB_FILENAME.c_str(), 0).IsFailure()) {
+            logToFile("[Database] Could not create the database file\n");
+            return;
+        } else {
+            logToFile("[Database] New database file created\n");
+        }
+
+        if(OpenFile(std::addressof(handle_database), DB_FILENAME.c_str(), OpenMode_Write | OpenMode_AllowAppend).IsFailure()) {
+            logToFile("[Database] The database file could not be opened for writing\n");
+            return;
+        }
+
+        const auto data = j_history.dump();
+        const auto s_data = data.c_str();
+
+        logToFile("[Database] Writing sessions data %s (size=%i)\n", s_data, std::strlen(s_data));
+        if(WriteFile(handle_database, 0, s_data, std::strlen(s_data), WriteOption::Flush).IsFailure()) {
+            logToFile("[Database] Could not write into database file\n");
+        }
+
+        CloseFile(handle_database);
     }    
 
     std::vector<HistoryEntry> getHistory(AccountUid uid, std::string date) {
@@ -134,24 +199,34 @@ namespace alefbet::pctrl::database {
     {
         HistoryEntry result;
 
+        if(uid.uid[0] == 0 || uid.uid[1] == 0 || titleId == 0) {
+            logToFile("[Database] Wrong parameters\n");
+            return result;
+        }
+
         std::string uidToString = accountUidToString(uid);
 
         //Get current history
         History history = loadDatabase();
 
+        const auto& date = today();
+        if(date.empty()) {
+            return result;
+        }
+
         //Search existing entry
-        auto entries = history.entries(uid, today(), titleId);
+        auto entries = history.entries(uid, date, titleId);
 
         if(!entries.empty()) {
             auto entry = entries[0];
             logToFile("[Database] entry found for user %s with title ID %i\n", uidToString.c_str(), titleId);
             entry.setDurationInMinutes(duration_in_minutes + entry.durationInMinutes());
-            logToFile("[Database] new duration is %i", entry.durationInMinutes());
+            logToFile("[Database] new duration is %i\n", entry.durationInMinutes());
             result = entry;
         } else {
             //Or create a new one
             logToFile("[Database] no entry found for user %s with title ID %i\n", uidToString.c_str(), titleId);
-            HistoryEntry entry = HistoryEntry(uid, today(), titleId, duration_in_minutes);
+            HistoryEntry entry = HistoryEntry(uid, date, titleId, duration_in_minutes);
             history.addEntry(entry);
             result = entry;
         }
@@ -171,12 +246,14 @@ namespace alefbet::pctrl::database {
 
             saveSetting(settings, Setting {
                 .key = SETTING_DAILY_LIMIT_GAME,
-                .int_value = 1*3600 //Default: 1 hour
+                .type = INTEGER,
+                .int_value = 1*60 //Default: 1 hour
             });
                         
             saveSetting(settings, Setting {
                 .key = SETTING_DAILY_LIMIT_GLOBAL,
-                .int_value = 1*3600 //Default: 1 hour
+                .type = INTEGER,
+                .int_value = 1*60 //Default: 1 hour
             });
         } else {
             s64 fileSize = 0;
@@ -216,21 +293,47 @@ namespace alefbet::pctrl::database {
             logToFile("[Database] Parse settings file\n");
             json j_settings = json::parse(data_settings);            
 
-            if(j_settings.contains(SETTING_DAILY_LIMIT_GAME)) {
-                Setting setting;
-                setting.key = SETTING_DAILY_LIMIT_GAME;
-                setting.int_value = j_settings[SETTING_DAILY_LIMIT_GAME].get<int>();
-                settings[SETTING_DAILY_LIMIT_GAME] = setting;
-            }
+            if(j_settings.contains("settings")) {
+                for(const auto& j_setting: j_settings["settings"]) {
+                    if(j_setting.is_object() && j_setting.contains("key") && j_setting.contains("type")) {
+                        Setting setting;
 
-            if(j_settings.contains(SETTING_DAILY_LIMIT_GLOBAL)) {
-                Setting setting;
-                setting.key = SETTING_DAILY_LIMIT_GLOBAL;
-                setting.int_value = j_settings[SETTING_DAILY_LIMIT_GLOBAL].get<int>();
-                settings[SETTING_DAILY_LIMIT_GLOBAL] = setting;
+                        setting.key = j_setting["key"].get<std::string>();
+                        setting.type = j_setting["type"].get<SettingType>();
+
+                        switch(setting.type) {
+                            case INTEGER: setting.int_value = j_setting["value"].get<u64>(); break;
+                            case DOUBLE: setting.double_value = j_setting["value"].get<double>(); break;
+                            case STRING: setting.string_value = j_setting["value"].get<std::string>(); break;
+                        }
+
+                        settings[setting.key] = setting;
+                    } else {
+                        logToFile("[Database] setting is malformed\n");
+                    }
+                }
+                /*const auto& j__settings = j_settings["settings"];
+
+                if(j__settings.contains(SETTING_DAILY_LIMIT_GAME)) {                
+                    settings[SETTING_DAILY_LIMIT_GAME] = Setting {
+                        .key = SETTING_DAILY_LIMIT_GAME,
+                        .type = INTEGER,
+                        .int_value = j_settings[SETTING_DAILY_LIMIT_GAME].get<u64>()
+                    };
+                } else {
+                    logToFile("[Database] No daily game limit setting found\n");
+                }
+
+                if(j__settings.contains(SETTING_DAILY_LIMIT_GLOBAL)) {                
+                    settings[SETTING_DAILY_LIMIT_GLOBAL] = Setting {
+                        .key = SETTING_DAILY_LIMIT_GLOBAL,
+                        .type = INTEGER,
+                        .int_value = j_settings[SETTING_DAILY_LIMIT_GLOBAL].get<u64>()
+                    };
+                } else {
+                    logToFile("[Database] No daily global limit setting found\n");
+                }*/
             }
-            
-            logToFile("[Database] End");
 
             CloseFile(handle_settings);
             delete[] data_settings;
@@ -246,33 +349,56 @@ namespace alefbet::pctrl::database {
     }
     
     void saveSettings(Settings& settings) {
-        std::lock_guard<std::mutex> lock(mutex_settings);
+        logToFile("[Database] Saving settings\n");
+        std::lock_guard<std::mutex> lock(mutex_settings);        
 
         //Update database file
-        json j_settings({});
+        json j_entries;
+        
+        auto values = settings | std::views::values;        
+        for(const auto& value : values) {
+            json j_entry = json::object( {
+                { "type", value.type },
+                { "key", value.key }
+            });
+            
+            if(value.type == INTEGER) {                
+                j_entry["value"] = value.int_value;
+            } else if(value.type == DOUBLE) {
+                j_entry["value"] = std::to_string(value.double_value);
+            } else if(value.type == STRING) {
+                j_entry["value"] = value.string_value;
+            } else {
+                j_entry["value"] = "";
+            }            
 
-        for(const auto& [key, value] : settings) {
-            switch(value.type) {
-                case INTEGER: j_settings[key] = value.int_value; break;
-                case DOUBLE: j_settings[key] = value.double_value; break;
-                case STRING: j_settings[key] = value.string_value; break;
-            }
+            j_entries.push_back(j_entry);
         }
 
-        DeleteFile(SETTINGS_FILENAME.c_str());
-        bool ok = CreateFile(SETTINGS_FILENAME.c_str(), 0).IsSuccess();
-        if(!ok) {
+        json j_settings = json{
+            { "settings", j_entries }
+        };
+
+
+        ams::Result res = DeleteFile(SETTINGS_FILENAME.c_str());
+        if(res.IsFailure()) {
+            logToFile("[Database] Could not delete the settings file\n"); //Error 514?            
+        } else {
+            logToFile("[Database] Successfully removed current settings\n");
+        }
+        
+        if(CreateFile(SETTINGS_FILENAME.c_str(), 0).IsFailure()) {
             logToFile("[Database] Could not create the settings file\n");
             return;
         } else {
             logToFile("[Database] New settings file created\n");
         }
 
-        bool opened = OpenFile(std::addressof(handle_settings), SETTINGS_FILENAME.c_str(), OpenMode_Write | OpenMode_AllowAppend).IsSuccess();
-
-        if(!opened) {
+        if(OpenFile(std::addressof(handle_settings), SETTINGS_FILENAME.c_str(), OpenMode_Write | OpenMode_AllowAppend).IsFailure()) {
             logToFile("[Database] The settings file could not be opened for writing\n");
             return;
+        } else {
+            logToFile("[Database] Settings file successfully opened\n");
         }
 
         const auto data = j_settings.dump();

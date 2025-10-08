@@ -4,7 +4,7 @@
 #include <switch.h>
 #include "Command.hpp"
 #include "AppContext.h"
-#include "helpers.h"
+#include "helpers/ipc_helpers.h"
 
 using namespace alefbet::pctrl;
 
@@ -45,7 +45,7 @@ void DebugMenu::rebuildUI() {
     });
 
     // Current User
-    auto currentUser = ipc::getCurrentUser();
+    auto currentUser = ipc::getCurrentUserNickname();
     auto entryUser = new tsl::elm::ListItem("Current user: " +currentUser);
     rootList_->addItem(entryUser);
     
