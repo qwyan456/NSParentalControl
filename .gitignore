@@ -43,3 +43,4 @@
 # build dirs
 build/
 out/
+build.nosync/
