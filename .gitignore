@@ -48,3 +48,5 @@ build.nosync/
 *.ovl
 *.nacp
 *.log
+
+.DS_Store
