@@ -165,29 +165,80 @@ namespace alefbet::pctrl::ipc {
         return verified;
     }
 
-    /*IpcData ipcBufferToData(u8* buffer, size_t length) {
-        IpcData data;
+    bool setupPin(const std::string& pin) {
+        logToFile("[IPC] Setup new PIN");
 
-        // We parse the buffer
-        for(size_t i = 0 ; i < length-1 ; i++) {
-            // First IpcDataElement
-            IpcDataType type = static_cast<IpcDataType>(buffer[i]);
-            if(type < IpcString) {
-                logToFile("[IPC] The IPC type is unknown.");
-                logIntToFile(buffer[i]);
-                return data;
-            }
+        Service service = getAppContext().pctrl_service;
+        char pin_str[8] = {0};
+        std::strncpy(pin_str, pin.c_str(), pin.size());
+        logToFile("PIN");
+        logToFile(pin_str);
+        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::VerifyAdminPin, pin_str);
 
-            IpcDataElement elm {
-                .type = type
-            };
-
-            switch(type) {
-                case IpcInteger: elm.value = buffer[i+1];
-            }
+        if(R_FAILED(res)) {
+            logToFile("[IPC] An error occured during the setup of the Admin PIN.");
+            return false;
         }
 
-        return data;
-    }*/
+        return true;
+    }
 
+    bool setWorkingMode(const WorkingMode& mode) {
+        logToFile("[IPC] Setting working mode");
+
+        Service service = getAppContext().pctrl_service;
+        int _mode = (u8)mode;
+        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetWorkingMode, _mode);
+
+        if(R_FAILED(res)) {
+            logToFile("[IPC] An error occured while setting up the working mode.");
+            return false;
+        }
+
+        return true;
+    }
+
+    WorkingMode getWorkingMode() {
+        logToFile("[IPC] Getting working mode");
+
+        WorkingMode workingMode = WorkingModeInfo;
+
+        Service service = getAppContext().pctrl_service;
+        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::GetWorkingMode, workingMode);
+
+        if(R_FAILED(res)) {
+            logToFile("[IPC] An error occured while getting the working mode.");
+        }
+
+        return workingMode;
+    }
+    
+    bool setShowRemainingTime(const bool& active) {
+        logToFile("[IPC] Setting remaining time visibility");
+
+        Service service = getAppContext().pctrl_service;
+        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetShowRemainingTime, active);
+
+        if(R_FAILED(res)) {
+            logToFile("[IPC] An error occured while setting up remaining time visibility.");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool getShowRemainingTime() {
+        logToFile("[IPC] Getting remaining time visibility");
+
+        u8 visible = 0;
+
+        Service service = getAppContext().pctrl_service;
+        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::GetShowRemainingTime, visible);
+
+        if(R_FAILED(res)) {
+            logToFile("[IPC] An error occured while getting the remaining time visibility.");
+        }
+
+        return visible == 1 ? true : false;
+    }
 }

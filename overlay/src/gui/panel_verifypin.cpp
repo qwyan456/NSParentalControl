@@ -35,7 +35,7 @@ tsl::elm::Element* VerifyPinPanel::createUI() {
 void VerifyPinPanel::rebuildUI() {     
     rootList_->addItem(new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *renderer, s32 x, s32 y, s32 w, s32 h) {
         renderer->drawString("Please enter Admin PIN", false, x + 20, y + 20, 20, renderer->a(0xFFFF));            
-        renderer->drawString("Use all pad keys except B", false, x + 20, y + 45, 20, renderer->a(0xFFFF));            
+        //renderer->drawString("Use all pad keys except B", false, x + 20, y + 45, 20, renderer->a(0xFFFF));            
     }), 50);
 
     rootList_->addItem(new tsl::elm::CategoryHeader("Admin PIN"));

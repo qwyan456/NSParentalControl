@@ -34,10 +34,11 @@ tsl::elm::Element* SetupPinPanel::createUI() {
 
 void SetupPinPanel::rebuildUI() {    
     rootList_->addItem(new tsl::elm::CustomDrawer([this](tsl::gfx::Renderer* renderer, s32 x, s32 y, s32 w, s32 h) {
-        renderer->drawString("Use all pad keys except B", false, 0, 0, 20, renderer->a(0xff0f));
-    }));
+        renderer->drawString("Please enter the new PIN", false, x + 20, y + 20, 20, renderer->a(0xFFFF));  
+        //renderer->drawString("Use all pad keys except B", false, 0, 0, 20, renderer->a(0xff0f));
+    }), 30);
 
-    rootList_->addItem(new tsl::elm::CategoryHeader("Current PIN"));    
+    /*rootList_->addItem(new tsl::elm::CategoryHeader("Current PIN"));    
     rootList_->addItem(new tsl::elm::CustomDrawer([this](tsl::gfx::Renderer* renderer, s32 x, s32 y, s32 w, s32 h) {
         u16 spacing = w/5;
         bool active = false;        
@@ -46,7 +47,7 @@ void SetupPinPanel::rebuildUI() {
             active = currentPin_.size() >= i;
             renderer->drawCircle(x + i*spacing, y + 15, 15, active, ColorReady);
         }
-    }), 30);
+    }), 30);*/
 
     rootList_->addItem(new tsl::elm::CategoryHeader("New PIN"));
     rootList_->addItem(new tsl::elm::CustomDrawer([this](tsl::gfx::Renderer* renderer, s32 x, s32 y, s32 w, s32 h) {
@@ -55,7 +56,7 @@ void SetupPinPanel::rebuildUI() {
 
         for(size_t i = 1 ; i < 5 ; i++) {
             active = newPin_.size() >= i;
-            renderer->drawCircle(x + i*spacing, y + 15, 15, active, currentPin_.size() < 4 ? ColorNotReady : ColorReady);
+            renderer->drawCircle(x + i*spacing, y + 15, 15, active, ColorReady);
         }
     }), 30);
 
@@ -71,8 +72,10 @@ void SetupPinPanel::rebuildUI() {
     }), 30);    
 
     rootList_->addItem(new tsl::elm::CustomDrawer([this](tsl::gfx::Renderer* renderer, s32 x, s32 y, s32 w, s32 h) {
-        if(error_) {
-            renderer->drawString("PINs do not match", false, x + 90, y + 30, 20, renderer->a(RGBA4(0xf, 0x0, 0x0, 0xf)));
+        if(error_ != NO_ERROR) {
+            const char* lblError = error_ == VERIFY_ERROR ? "PINs do not match" : "unknown error";
+
+            renderer->drawString(lblError, false, x + 90, y + 30, 20, renderer->a(RGBA4(0xf, 0x0, 0x0, 0xf)));
             renderer->drawString("Press A to retry, B to cancel", false, x + 50, y + 55, 20, renderer->a(RGBA4(0xf, 0xf, 0xf, 0xf)));
         }
     }), 60);
@@ -94,7 +97,7 @@ bool SetupPinPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouchState 
             verifyPin_.clear();
             newPin_.clear();
             verifyPin_.clear();
-            error_ = false;
+            error_ = NO_ERROR;
             return true;
         } 
 
@@ -108,24 +111,27 @@ bool SetupPinPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouchState 
         return false;
     }
 
-    if(currentPin_.size() < (size_t)4) {
+    /*if(currentPin_.size() < (size_t)4) {
         currentPin_.push_back(keysDown);
-    } else if(newPin_.size() < (size_t)4) {
+    } else*/ if(newPin_.size() < (size_t)4) {
         newPin_.push_back(keysDown);
     } else if(verifyPin_.size() < (size_t)4) {
         verifyPin_.push_back(keysDown);            
 
-        if(currentPin_.size() == 4 && newPin_.size() == 4 && verifyPin_.size() == 4) {
-            // Step 1: verify current PIN
+        if(/*currentPin_.size() == 4 &&*/ newPin_.size() == 4 && verifyPin_.size() == 4) {
+            // Step 1: verify current PIN -> REMOVED
             // Step 2: verify whether new PINs match
             // Step 3: send new PIN to the sysmodule
             // Step 4: handle sysmodule error
-            
+
             bool verified = newPin_ == verifyPin_;
             if(!verified) {
-                error_ = true;
+                error_ = VERIFY_ERROR;
             } else {
-                tsl::goBack();
+                bool res = ipc::setupPin(ipc::encodeAdminPin(newPin_));
+                if(!res) {
+                    error_ = SERVICE_ERROR;
+                }
             }
         }
                     

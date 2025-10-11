@@ -3,7 +3,6 @@
 #include "helpers.h"
 #include "database/settings.h"
 #include "database/database.h"
-#include "pctrl_screen.hpp"
 #include <chrono>
 
 using namespace alefbet::pctrl::logger;
@@ -54,14 +53,10 @@ namespace alefbet::pctrl::srv {
                     const auto remaining_time = remainingTimeInMinutes(entry);
                     const auto uid_str = accountUidToString(user.uid);                    
 
-                    service_->gui().UpdateRemainingTime(remaining_time);
-
                     if(remaining_time <= 0) {
                         logToFile("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
-                        service_->gui().ShowScreenTimeout();
                     } else if(remaining_time <= 5) {
                         logToFile("[Monitor] Remaining time for user %i is exactly 5 minutes. Warn the user.\n", uid_str);
-                        service_->gui().ShowScreenWarning();
                     } else {
                         logToFile("[Monitor] Remaining time for user %s is %i minutes.\n", user.nickname.c_str(), remaining_time);
                     }

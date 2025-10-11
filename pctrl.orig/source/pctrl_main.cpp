@@ -174,16 +174,8 @@ namespace ams {
         srv->listen();            
     }
 
-    void startMonitor(void* args) {
-        void** _args = (void**)args;
-        alefbet::pctrl::srv::Monitor* monitor = static_cast<alefbet::pctrl::srv::Monitor*>(_args[0]);
-        alefbet::pctrl::srv::PctrlService* service = static_cast<alefbet::pctrl::srv::PctrlService*>(_args[1]);
-
-        logToFile("@monitor=%p\n", monitor);
-        logToFile("@service=%p\n", service);
-
+    void startMonitor(void* monitor) {
         alefbet::pctrl::srv::Monitor* mon = static_cast<alefbet::pctrl::srv::Monitor*>(monitor);
-        mon->setService(service);
         mon->start();
     }
 
@@ -194,6 +186,8 @@ namespace ams {
         /* Set thread name. */
         os::SetThreadNamePointer(os::GetCurrentThread(), "alefbet.pctrl.Main");        
 
+        //alefbet::pctrl::srv::AllocateHeapForThreads();
+        //alefbet::pctrl::srv::AllocateStackForThreads();
         alefbet::pctrl::srv::SetupMemory();
 
         int on_stack = 0;
@@ -203,6 +197,21 @@ namespace ams {
 
         ::Result rc = 0;
 
+        /*NsApplicationRecord records[20];
+        s32 rCount = 0;
+        rc = nsListApplicationRecord(std::addressof(records[0]), 20, 0, &rCount);
+ 
+        logToFile("rc=%i\n", rc);
+        logToFile("Title count=%i\n", rCount);
+        NsApplicationControlData control_data;
+        u64 actual_size = 0;
+        for(int i = 0 ; i < rCount ; i++) {
+            NsApplicationRecord rec = records[i];                        
+            nsGetApplicationControlData(NsApplicationControlSource_Storage, rec.application_id, &control_data, sizeof(control_data), &actual_size);
+            std::string app_name = std::string(control_data.nacp.lang[0].name);
+            logToFile("app: %i, %i, %s\n", rec.application_id, rec.type, app_name);
+        }*/
+
         // Loop processing the IPC server.        
         Ipc::Server* ipcServer = new Ipc::Server("pctrl");
         logToFile("@ipcServer=%p\n", (void*)ipcServer);
@@ -211,7 +220,8 @@ namespace ams {
         
         Thread threadIpc;
         //TODO: replace heap with malloc buffer?
-        rc = threadCreate(&threadIpc, startIpc, service, g_thread_service_memory, ThreadServiceStackRequiredSizeAligned, 0x2c, -2);               
+        rc = threadCreate(&threadIpc, startIpc, service, g_thread_service_memory, ThreadServiceStackRequiredSizeAligned, 0x2c, -2);        
+        //rc = threadCreate(&threadIpc, startIpc, &service, NULL, 0, 0x2c, -2);        
         if(R_FAILED(rc)) {
             logToFile("Could not create the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return;
@@ -224,8 +234,7 @@ namespace ams {
 
         Thread threadMonitor;
         alefbet::pctrl::srv::Monitor* monitor = new alefbet::pctrl::srv::Monitor();
-        void* monitorArgs[2] { monitor, service };
-        rc = threadCreate(&threadMonitor, startMonitor, &monitorArgs, g_thread_monitor_memory, ThreadMonitorStackRequiredSizeAligned, 0x2c, -2);
+        rc = threadCreate(&threadMonitor, startMonitor, monitor, g_thread_monitor_memory, ThreadMonitorStackRequiredSizeAligned, 0x2c, -2);
         if(R_FAILED(rc)) {
             logToFile("Could not create the monitor thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return;

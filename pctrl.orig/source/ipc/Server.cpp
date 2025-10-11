@@ -1,0 +1,186 @@
+#include "Server.hpp"
+#include "../logger.h"
+
+// This was heavily inspired by sys-clk's ipc server, a big thanks to those
+// who wrote the original C version:
+// --------------------------------------------------------------------------
+// "THE BEER-WARE LICENSE" (Revision 42):
+// <p-sam@d3vs.net>, <natinusala@gmail.com>, <m4x@m4xw.net>
+// wrote this file. As long as you retain this notice you can do whatever you
+// want with this stuff. If you meet any of us some day, and you think this
+// stuff is worth it, you can buy us a beer in return.  - The sys-clk authors
+// --------------------------------------------------------------------------
+namespace Ipc {
+    using namespace alefbet::pctrl::logger;
+
+    constexpr uint64_t waitTimeout = UINT64_MAX;                // Wait timeout when processing
+
+    Server::Server(const std::string & name, const size_t maxClients) {
+        // Set status variables
+        this->error_ = false;
+        this->handler = nullptr;
+        this->maxHandles = maxClients + 1;
+        this->handles.reserve(this->maxHandles);
+
+        // Exit if invalid session count given
+        if (maxClients < 1 || maxClients > MAX_WAIT_OBJECTS - 1) {
+            logToFile("[IPC] Invalid number of sessions requested\n");
+            this->error_ = true;
+            return;
+        }
+
+        // Create server
+        Handle serverHandle;
+        this->serverName = smEncodeName(name.c_str());
+        ::Result rc = smRegisterService(&serverHandle, this->serverName, false, maxClients);
+        if (R_FAILED(rc)) {
+            logToFile("[IPC] Couldn't create server: %i\n", rc);
+            return;
+        }
+
+        logToFile("[IPC] Server started\n");
+        this->handles.push_back(serverHandle);
+    }
+
+    bool Server::processSession(const int32_t index) {
+        int tmp;
+
+        // Wait for request
+        ::Result rc = svcReplyAndReceive(&tmp, &this->handles[index], 1, 0, UINT64_MAX);
+        if (R_FAILED(rc)) {
+            logToFile("[IPC] Couldn't receive request (closing handle): %i\n", rc);
+            svcCloseHandle(this->handles[index]);
+            this->handles.erase(this->handles.begin() + index);
+            return true;        // Return true as closing a session is valid behaviour
+        }
+
+        // Create object from received data
+        Request * request = Request::fromTLS();
+        if (!request) {
+            logToFile("[IPC] An error occurred creating the request object (most likely bad header magic)\n");
+            return false;
+        }
+
+        // Take action based on request type
+        bool closeSession = false;
+        switch (request->type()) {
+            // Call handler to prepare response
+            case Request::Type::Request: {
+                uint32_t result = this->handler(request);
+                request->setResult(result);
+                request->toResponseTLS();
+                break;
+            }
+
+            // Prepare default response
+            case Request::Type::Close:
+                request->setResult(0);
+                request->toResponseTLS();
+                closeSession = true;
+                break;
+
+            // Otherwise prepare error response
+            default:
+                logToFile("[IPC] Received unexpected CmifCommand (%i)\n", request->type());
+                request->setResult(MAKERESULT(11, 403));
+                request->toResponseTLS();
+                break;
+        }
+
+        // Send response and delete object
+        rc = svcReplyAndReceive(&tmp, &this->handles[index], 0, this->handles[index], 0);
+        if (rc == KERNELRESULT(TimedOut)) {
+            rc = 0;
+        }
+        delete request;
+
+        // Close session on error or close request
+        if (R_FAILED(rc) || closeSession) {
+            logToFile("Closing session %i due to error/request\n", index);
+            svcCloseHandle(this->handles[index]);
+            this->handles.erase(this->handles.begin() + index);
+        }
+
+        return (R_SUCCEEDED(rc));
+    }
+
+    bool Server::processNewSession() {
+        Handle session;
+        ::Result rc = svcAcceptSession(&session, this->handles[0]);
+        if (R_SUCCEEDED(rc)) {
+            // Check we have room
+            if (this->handles.size() >= this->maxHandles) {
+                logToFile("[IPC] Couldn't handle new session due to limit\n");
+                svcCloseHandle(session);
+
+            // Add session to vector
+            } else {
+                this->handles.push_back(session);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    void Server::setRequestHandler(Handler f) {
+        this->handler = f;
+    }
+
+    bool Server::process() {
+        if (this->error_) {
+            return false;
+        }
+
+        // Wait for a client to send a request/message
+        int32_t handleIndex;
+        ::Result rc = svcWaitSynchronization(&handleIndex, &this->handles[0], this->handles.size(), waitTimeout);
+        if (R_VALUE(rc) == KERNELRESULT(TimedOut)) {
+            return !this->error_;
+        }
+
+        if (R_SUCCEEDED(rc)) {
+            // Check we're within range
+            if (handleIndex < 0 || static_cast<uint32_t>(handleIndex) >= this->handles.size()) {
+                logToFile("[IPC] svcWaitSynchronization returned out of range index: %i\n", handleIndex);
+                this->error_ = true;
+                return false;
+            }
+
+            // If the index is not zero then we need to handle that client's request
+            bool ok = true;
+            if (handleIndex != 0) {
+                ok = this->processSession(handleIndex);
+
+            // Otherwise prepare for a new session
+            } else {
+                ok = this->processNewSession();
+            }
+
+            // Exit on an error
+            if (!ok) {
+                logToFile("[IPC] Failed to handle %s %i request\n", handleIndex == 0 ? "server" : "client ", handleIndex);
+                this->error_ = true;
+            }
+        }
+
+        return !this->error_;
+    }
+
+    Server::~Server() {
+        // Close all client handles
+        for (size_t i = 1; i < this->handles.size(); i++) {
+            svcCloseHandle(this->handles[i]);
+        }
+
+        // Finally close server handle
+        if (!this->handles.empty()) {
+            svcCloseHandle(this->handles[0]);
+            ::Result rc = smUnregisterService(this->serverName);
+            if (R_FAILED(rc)) {
+                logToFile("[IPC] Couldn't unregister server: %i\n", rc);
+            }
+        }
+    }
+}

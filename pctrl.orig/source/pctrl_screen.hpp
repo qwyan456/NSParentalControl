@@ -36,15 +36,11 @@ namespace alefbet::pctrl::srv {
             ::Result SetupDisplayExternal();
             ::Result PrepareScreenForDrawing();
             void   PreRenderFrameBuffer();
-            ::Result PreRenderContents();
             ::Result InitializeNativeWindow();
             void   DisplayPreRenderedFrame();           
 
         public:            
             ::Result ShowScreenTimeout();
-            ::Result ShowRemainingTime();
-            ::Result ShowScreenWarning();
-            ::Result UpdateRemainingTime(u8 remaining_time_in_minutes);
             void HideScreen();            
 
         private:
@@ -52,8 +48,7 @@ namespace alefbet::pctrl::srv {
             ViLayer m_layer;
             NWindow m_win;
             NvMap m_map;    
-            //u8* heap_pointer_ = nullptr;
-            u8 m_remaining_time_in_minutes = 0;
+            u8* heap_pointer_ = nullptr;        
     };
     
 }
