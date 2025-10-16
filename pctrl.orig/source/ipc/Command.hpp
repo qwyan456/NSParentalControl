@@ -13,6 +13,10 @@ namespace Ipc {
         GetRunningApplication,
         SetUserLimits,      /*! Sets a users limits. */
         SetAdminPin,        /*! Sets the administrator PIN. */
-        VerifyAdminPin,     /*! Verifies the PIN entered by the admin. */        
+        VerifyAdminPin,     /*! Verifies the PIN entered by the admin. */  
+        SetWorkingMode,     /*! Sets the working mode (information, blocking) */   
+        GetWorkingMode,
+        SetShowRemainingTime,  /*! Activate the remaining time badge in the upper right corner*/
+        GetShowRemainingTime
     };
 };

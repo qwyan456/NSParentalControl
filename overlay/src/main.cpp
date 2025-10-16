@@ -37,7 +37,7 @@ bool connectToService() {
 
     logToFile("[Overlay] Connexion au service effectuée");
     logIntToFile(getAppContext().pctrl_service.session);
-    getAppContext().is_ready = true;
+    getAppContext().is_enabled = true;
 
     return true;
 }
@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
     tsl::loop<MainOverlay>(argc, argv);    
 
     logToFile("[Overlay] Close session");
-    if(getAppContext().is_ready) {
+    if(getAppContext().is_enabled) {
         svcCloseHandle(getAppContext().pctrl_service.session);   
     }
 

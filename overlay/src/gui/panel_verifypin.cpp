@@ -88,7 +88,7 @@ bool VerifyPinPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouchState
     } 
     
     if(verifyPin_.size() == 4) {
-        bool verified = ipc::verifyPin(ipc::encodeAdminPin(verifyPin_));
+        bool verified = ipc::verifyPin(verifyPin_);
 
         if(!verified) {
             error_ = true;

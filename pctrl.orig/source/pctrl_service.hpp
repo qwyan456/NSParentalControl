@@ -18,8 +18,6 @@
 #include <vector>
 #include "ipc/Server.hpp"
 #include "pctrl_screen.hpp"
-//#include "pctrl_screen.hpp"
-//#include "pctrl_i_service.hpp"
 
 namespace alefbet::pctrl::srv {
 
@@ -27,13 +25,15 @@ namespace alefbet::pctrl::srv {
 
     class PctrlService {
         public:
-            PctrlService(Ipc::Server* ipcServer/*, u8* heap_pointer*/);
+            PctrlService(Ipc::Server* ipcServer);
             ~PctrlService();
-            void listen();            
-            //void closeAndClean();
+            
+            void listen();
+            GuiController&& gui() {
+                return std::move(gui_);
+            }
 
         private:
-            //void process();
             Ipc::Result commandThread(Ipc::Request*);
 
             // Handlers
@@ -44,17 +44,18 @@ namespace alefbet::pctrl::srv {
             Ipc::Result getUsersList(Ipc::Request*);
             Ipc::Result getUserUsageTime(Ipc::Request*);
             Ipc::Result getUserRemainingTime(Ipc::Request*);
-            Ipc::Result setUserLimits(const u32&);
-            Ipc::Result setAdminPin(const std::string&);
+            Ipc::Result setUserLimits(Ipc::Request*);
+            Ipc::Result setAdminPin(Ipc::Request*);
             Ipc::Result verifyAdminPin(Ipc::Request*);
+            Ipc::Result setWorkingMode(Ipc::Request*);
+            Ipc::Result getWorkingMode(Ipc::Request*);
+            Ipc::Result setShowRemainingTime(Ipc::Request*);
+            Ipc::Result getShowRemainingTime(Ipc::Request*);
 
         private:
             bool is_ready_ = false;
             bool session_opened_ = false;
-            //Handle handle_server = 0;
-            //Handle handle_client = 0;     
             Ipc::Server *ipcServer_ = nullptr;
-            //u8* heap_pointer_ = nullptr;
             GuiController gui_;
     };
 

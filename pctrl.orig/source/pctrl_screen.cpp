@@ -16,17 +16,18 @@
 #include "pctrl_screen.hpp"
 #include "pctrl_font.hpp"
 #include "logger.h"
+#include "database/database.h"
 
 namespace util = ams::util;
 namespace os = ams::os;
 namespace svc = ams::svc;
 namespace font = alefbet::pctrl::font;
 namespace dd = ams::dd;
-//namespace aarch64 = ams::svc::aarch64;
 namespace hos = ams::hos;
 using namespace ams;
 using namespace ams::literals;      
 using namespace alefbet::pctrl::logger;
+using namespace alefbet::pctrl::database;
 
 /* There should only be a single transfer memory (for nv). */
 alignas(os::MemoryPageSize) constinit u8 g_nv_transfer_memory[0x40000];
@@ -45,8 +46,8 @@ namespace alefbet::pctrl::srv {
     namespace {
 
         /* Screen definitions. */
-        constexpr u32 PctrlScreenWidth = 1280;
-        constexpr u32 PctrlScreenHeight = 720;
+        constexpr u32 PctrlScreenWidth = 400; // 1280
+        constexpr u32 PctrlScreenHeight = 300; // 720
         constexpr u32 PctrlScreenBpp = 2;
         constexpr u32 PctrlLayerZ = 100;
         constexpr u16 BackgroundColor = RGB888_TO_RGB565(0x7, 0x7, 0x7);
@@ -73,11 +74,11 @@ namespace alefbet::pctrl::srv {
     }
 
     void GuiController::InitializeFrameBufferPointer() {
-        if(heap_pointer_ != nullptr) {
+        /*if(heap_pointer_ != nullptr) {
             g_framebuffer_pointer = heap_pointer_;
             logToFile("[Screen] g_framebuffer_pointer points to heap_pointer\n");
             return;
-        }
+        }*/
 
         // We couldn't use heap, so try insecure memory, from the system nonsecure pool.
         {
@@ -267,12 +268,16 @@ namespace alefbet::pctrl::srv {
             return;
         }
 
-        /* Pre-render the image into the static framebuffer. */
-        u16 *tiled_buf = reinterpret_cast<u16 *>(g_framebuffer_pointer);
-
         /* Temporarily use the NV transfer memory as font backing heap. */
         font::SetHeapMemory(g_nv_transfer_memory, sizeof(g_nv_transfer_memory));
         ON_SCOPE_EXIT { std::memset(g_nv_transfer_memory, 0, sizeof(g_nv_transfer_memory)); };
+
+        PreRenderContents();
+    }
+
+    ::Result GuiController::PreRenderContents() {
+        /* Pre-render the image into the static framebuffer. */
+        u16 *tiled_buf = reinterpret_cast<u16 *>(g_framebuffer_pointer);
 
         /* Let the font manager know about our framebuffer. */
         font::ConfigureFontFramebuffer(tiled_buf, GetPixelOffset);
@@ -296,7 +301,9 @@ namespace alefbet::pctrl::srv {
         font::PrintFormat("PrintFormat");
         font::AddSpacingLines(1.0f);
         font::PrintFormatLine("PrintFormatLine");
-        font::AddSpacingLines(0.5f);            
+        font::AddSpacingLines(0.5f);     
+        
+        return 0;
     }
 
     ::Result GuiController::InitializeNativeWindow() {
@@ -373,6 +380,14 @@ namespace alefbet::pctrl::srv {
 
     ::Result GuiController::ShowScreenTimeout() {
         logToFile("[Screen] Show timeout screen\n");
+        auto settings = loadSettings();
+
+        if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
+            if(settings[SETTING_SHOW_REMAINING_TIME].int_value > 0) {
+                logToFile("[Screen] display mode is remaining time.\n");
+                return 0;
+            }
+        }
 
         /* Pre-render the framebuffer. */
         this->PreRenderFrameBuffer();
@@ -387,6 +402,68 @@ namespace alefbet::pctrl::srv {
         /* Display the pre-rendered frame. */
         this->DisplayPreRenderedFrame();
         
+        return 0;
+    }
+
+    ::Result GuiController::ShowRemainingTime() {
+        logToFile("[Screen] Show the remaining time\n");   
+        auto settings = loadSettings();
+
+        if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
+            if(settings[SETTING_SHOW_REMAINING_TIME].int_value == 0) {
+                logToFile("[Screen] display mode is blocking.\n");
+                return 0;
+            }
+        }     
+
+        /* Pre-render the framebuffer. */
+        this->PreRenderFrameBuffer();
+
+        /* Prepare screen for drawing. */
+        ::Result res = this->PreRenderContents();
+        if(res != 0) {
+            logToFile("[Screen] PreRenderContents failed\n");
+            return res;
+        }
+
+        /* Display the pre-rendered frame. */
+        this->DisplayPreRenderedFrame();
+
+        return 0;
+    }
+
+    ::Result GuiController::UpdateRemainingTime(u8 remaining_time_in_minutes) {
+        logToFile("[Screen] Update remaining time\n");
+        auto settings = loadSettings();
+
+        if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
+            if(settings[SETTING_SHOW_REMAINING_TIME].int_value == 0) {
+                logToFile("[Screen] display mode is blocking.\n");
+                return 0;
+            }
+        }
+
+        this->m_remaining_time_in_minutes = remaining_time_in_minutes;
+
+        this->DisplayPreRenderedFrame();
+
+        return 0;
+    }
+
+    ::Result GuiController::ShowScreenWarning() {
+        logToFile("[Screen] Show warning screen\n");
+
+        auto settings = loadSettings();
+
+        if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
+            if(settings[SETTING_SHOW_REMAINING_TIME].int_value > 0) {
+                logToFile("[Screen] display mode is blocking.\n");
+                return 0;
+            }
+        }
+
+        // Todo
+
         return 0;
     }
 

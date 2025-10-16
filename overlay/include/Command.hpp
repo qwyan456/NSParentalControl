@@ -17,6 +17,8 @@ namespace Ipc {
         SetWorkingMode,     /*! Sets the working mode (information, blocking) */   
         GetWorkingMode,
         SetShowRemainingTime,  /*! Activate the remaining time badge in the upper right corner*/
-        GetShowRemainingTime
+        GetShowRemainingTime,
+        IsEnabled,
+        SetEnabled
     };
 };

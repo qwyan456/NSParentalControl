@@ -3,6 +3,7 @@
 #include "helpers.h"
 #include "database/settings.h"
 #include "database/database.h"
+#include "pctrl_screen.hpp"
 #include <chrono>
 
 using namespace alefbet::pctrl::logger;
@@ -30,6 +31,7 @@ namespace alefbet::pctrl::srv {
 
     void Monitor::start() {
         logToFile("[Monitor] Starting monitoring\n");
+        WorkingMode workingMode = WorkingModeInfo;
 
         while(true) {
             logToFile("[Monitor] Update usages\n");
@@ -43,20 +45,47 @@ namespace alefbet::pctrl::srv {
 
                 if(user.isValid()) {
                     logToFile("[Monitor] Title %i is currently in used by %s. Updating history.\n", title_id, user.nickname.c_str());
+
+                    auto settings = loadSettings();
+
+                    for(const auto& [key, value]: settings) {
+                        logToFile("[Monitor] setting key: %s\n", key);                        
+                    }
+
+                    //Update working mode
+                    if(settings.contains(SETTING_WORKING_MODE)) {
+                        workingMode = (WorkingMode)settings[SETTING_WORKING_MODE].int_value;
+                        logToFile("[Monitor] Working mode is %i\n", workingMode);
+                    }
+
+                    if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
+                        if(settings[SETTING_SHOW_REMAINING_TIME].int_value == 1) {
+                            logToFile("[Monitor] Show remaining time.\n");
+                            service_->gui().ShowRemainingTime();
+                        }
+                    } else {
+                        logToFile("[Monitor] Force show remaining time (TEST)\n");
+                        service_->gui().ShowRemainingTime();
+                    }
+
                     const auto entry = addToHistory(user.uid, title_id, DelayInMinutes.count());
 
                     if(!entry.isValid()) {
                         continue;
                     }
-
+                    
                     // After database update we need to verify the limits
                     const auto remaining_time = remainingTimeInMinutes(entry);
                     const auto uid_str = accountUidToString(user.uid);                    
 
+                    //service_->gui().UpdateRemainingTime(remaining_time);
+
                     if(remaining_time <= 0) {
                         logToFile("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
+                        //service_->gui().ShowScreenTimeout();
                     } else if(remaining_time <= 5) {
                         logToFile("[Monitor] Remaining time for user %i is exactly 5 minutes. Warn the user.\n", uid_str);
+                        //service_->gui().ShowScreenWarning();
                     } else {
                         logToFile("[Monitor] Remaining time for user %s is %i minutes.\n", user.nickname.c_str(), remaining_time);
                     }

@@ -21,12 +21,14 @@ namespace alefbet::pctrl::ipc {
     u16 getUserRemainingTime();
 
     std::string encodeAdminPin(const std::vector<u64>&);
-    std::vector<u64> decodeAdminPin(const std::string&);
-    bool verifyPin(const std::string&);
-    bool setupPin(const std::string&);
+    //std::vector<u64> decodeAdminPin(const std::string&);
+    bool verifyPin(const std::vector<u64>&);
+    bool setupPin(const std::vector<u64>&);
 
     bool setWorkingMode(const WorkingMode&);
     WorkingMode getWorkingMode();
     bool setShowRemainingTime(const bool&);
     bool getShowRemainingTime();
+    bool isEnabled();
+    bool setEnabled(const bool&);
 }

@@ -9,6 +9,8 @@
 
 namespace alefbet::pctrl::ipc {
 
+    constexpr u8 PIN_LEN_MAX = 20*4+3;
+
     void startTest() {
         logToFile("[IPC] starting test");
             
@@ -124,7 +126,7 @@ namespace alefbet::pctrl::ipc {
         return pin;
     }
 
-    std::vector<u64> decodeAdminPin(const std::string& pin) {
+    /*std::vector<u64> decodeAdminPin(const std::string& pin) {
         std::vector<u64> keys;
 
         for (const auto part : std::views::split(pin, ",")) {
@@ -144,18 +146,20 @@ namespace alefbet::pctrl::ipc {
         logIntToFile(keys[3]);
 
         return keys;
-    }
+    }*/
 
-    bool verifyPin(const std::string& pin) {
+    bool verifyPin(const std::vector<u64>& pin) {
         logToFile("[IPC] Verify Admin PIN");
 
         Service service = getAppContext().pctrl_service;
         bool verified = false;
-        char pin_str[8] = {0};
-        std::strncpy(pin_str, pin.c_str(), pin.size());
+        u64 a_pin[4] = { 
+            pin[0], pin[1], pin[2], pin[3]
+        };        
+        //std::strncpy(pin_str, pin.c_str(), pin.size());
         logToFile("PIN");
-        logToFile(pin_str);
-        Result res = serviceDispatchInOut(&service, (u32)Ipc::Command::VerifyAdminPin, pin_str, verified);
+        logToFile(encodeAdminPin(pin).c_str());
+        Result res = serviceDispatchInOut(&service, (u32)Ipc::Command::VerifyAdminPin, a_pin, verified);
 
         if(R_FAILED(res)) {
             logToFile("[IPC] An error occured during the Admin PIN verification.");
@@ -165,15 +169,18 @@ namespace alefbet::pctrl::ipc {
         return verified;
     }
 
-    bool setupPin(const std::string& pin) {
+    bool setupPin(const std::vector<u64>& pin) {
         logToFile("[IPC] Setup new PIN");
 
         Service service = getAppContext().pctrl_service;
-        char pin_str[8] = {0};
-        std::strncpy(pin_str, pin.c_str(), pin.size());
+        //char pin_str[PIN_LEN_MAX+1] = {0};
+        //std::strncpy(pin_str, pin.c_str(), pin.size());
+        u64 a_pin[4] = { 
+            pin[0], pin[1], pin[2], pin[3]
+        }; 
         logToFile("PIN");
-        logToFile(pin_str);
-        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::VerifyAdminPin, pin_str);
+        logToFile(encodeAdminPin(pin).c_str());
+        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetAdminPin, a_pin);
 
         if(R_FAILED(res)) {
             logToFile("[IPC] An error occured during the setup of the Admin PIN.");
@@ -240,5 +247,40 @@ namespace alefbet::pctrl::ipc {
         }
 
         return visible == 1 ? true : false;
+    }
+
+    bool setEnabled(const bool& enabled) {
+        if(enabled)
+            logToFile("[IPC] Setting service enabled");
+        else 
+            logToFile("[IPC] Setting service disabled");
+
+        Service service = getAppContext().pctrl_service;
+        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetEnabled, enabled);
+
+        if(R_FAILED(res)) {
+            logToFile("[IPC] An error occured while change the state of the service.");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool isEnabled() {
+        logToFile("[IPC] Getting current state of the service");
+
+        u8 enabled = 0;
+
+        Service service = getAppContext().pctrl_service;
+        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::IsEnabled, enabled);
+
+        if(R_FAILED(res)) {
+            logToFile("[IPC] An error occured while getting the current service state.");
+        } else {
+            logToFile("[IPC] Service state is");
+            logIntToFile(enabled);
+        }
+
+        return enabled == 1 ? true : false;
     }
 }

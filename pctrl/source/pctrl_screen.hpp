@@ -18,42 +18,24 @@
 
 namespace alefbet::pctrl::srv {
 
-    //using AmsResult = ::ams::Result;       
-
-    #define TRY_AND_RETURN(res_expr, message)                                 \
-    {                                                                         \
-        if (const auto _tmp_r_try_rc = (res_expr); _tmp_r_try_rc != 0) {      \
-            alefbet::pctrl::logger::logToFile(message);                       \
-            return 1;                                                         \
-        }                                                                     \
-    }                                                                         \
-    
+    using Result = ams::Result;       
 
     class GuiController {            
         private:
-            void InitializeFrameBufferPointer();
-            ::Result SetupDisplayInternal();
-            ::Result SetupDisplayExternal();
-            ::Result PrepareScreenForDrawing();
+            Result SetupDisplayInternal();
+            Result SetupDisplayExternal();
+            Result PrepareScreenForDrawing();
             void   PreRenderFrameBuffer();
-            ::Result PreRenderContents();
-            ::Result InitializeNativeWindow();
-            void   DisplayPreRenderedFrame();           
-
-        public:            
-            ::Result ShowScreenTimeout();
-            ::Result ShowRemainingTime();
-            ::Result ShowScreenWarning();
-            ::Result UpdateRemainingTime(u8 remaining_time_in_minutes);
-            void HideScreen();            
-
+            Result InitializeNativeWindow();
+            void   DisplayPreRenderedFrame();                
+        public:
+            Result ShowScreenTimeout();
         private:
             ViDisplay m_display;
             ViLayer m_layer;
             NWindow m_win;
-            NvMap m_map;    
-            //u8* heap_pointer_ = nullptr;
-            u8 m_remaining_time_in_minutes = 0;
+            NvMap m_map;            
     };
-    
+
+    inline GuiController s_gui;
 }

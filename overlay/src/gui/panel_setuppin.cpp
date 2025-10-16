@@ -128,10 +128,12 @@ bool SetupPinPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouchState 
             if(!verified) {
                 error_ = VERIFY_ERROR;
             } else {
-                bool res = ipc::setupPin(ipc::encodeAdminPin(newPin_));
+                bool res = ipc::setupPin(newPin_);
                 if(!res) {
                     error_ = SERVICE_ERROR;
-                }
+                } else {
+                    tsl::goBack();
+                }                
             }
         }
                     

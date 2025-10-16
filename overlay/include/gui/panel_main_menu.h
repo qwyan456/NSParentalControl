@@ -12,8 +12,7 @@ public:
     void rebuildUI();
     void update() override;
     void closeAndClean();
-    bool isParentalControlInitialized();
-    bool isParentalControlActive();
+    bool isParentalControlEnabled();
     std::list<std::string> getUsersList();
 
     // Called once every frame to handle inputs not handled by other UI elements

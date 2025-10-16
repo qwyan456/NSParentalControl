@@ -291,23 +291,31 @@ namespace alefbet::pctrl::database {
             data_settings[fileSize] = '\0';
             logToFile("[Database] Settings data: %s\n", data_settings);
             logToFile("[Database] Parse settings file\n");
-            json j_settings = json::parse(data_settings);            
+            json j_settings = json::parse(data_settings);
+            logToFile("a1\n");
 
             if(j_settings.contains("settings")) {
+                logToFile("a2\n");
                 for(const auto& j_setting: j_settings["settings"]) {
+                    logToFile("a3\n");
                     if(j_setting.is_object() && j_setting.contains("key") && j_setting.contains("type")) {
+                        logToFile("a4\n");
                         Setting setting;
 
                         setting.key = j_setting["key"].get<std::string>();
+                        logToFile("a5\n");
                         setting.type = j_setting["type"].get<SettingType>();
+                        logToFile("a6\n");
 
                         switch(setting.type) {
                             case INTEGER: setting.int_value = j_setting["value"].get<u64>(); break;
                             case DOUBLE: setting.double_value = j_setting["value"].get<double>(); break;
                             case STRING: setting.string_value = j_setting["value"].get<std::string>(); break;
                         }
+                        logToFile("a7\n");
 
                         settings[setting.key] = setting;
+                        logToFile("a8\n");
                     } else {
                         logToFile("[Database] setting is malformed\n");
                     }
@@ -362,15 +370,12 @@ namespace alefbet::pctrl::database {
                 { "key", value.key }
             });
             
-            if(value.type == INTEGER) {                
-                j_entry["value"] = value.int_value;
-            } else if(value.type == DOUBLE) {
-                j_entry["value"] = std::to_string(value.double_value);
-            } else if(value.type == STRING) {
-                j_entry["value"] = value.string_value;
-            } else {
-                j_entry["value"] = "";
-            }            
+            switch(value.type) {
+                case INTEGER: j_entry["value"] = value.int_value; break;
+                case DOUBLE: j_entry["value"] = std::to_string(value.double_value); break;
+                case STRING: j_entry["value"] = value.string_value; break;            
+                default: j_entry["value"] = "";
+            }
 
             j_entries.push_back(j_entry);
         }
@@ -402,10 +407,15 @@ namespace alefbet::pctrl::database {
         }
 
         const auto data = j_settings.dump();
+        logToFile("t1\n");
         const auto s_data = data.c_str();
+        logToFile("t2\n");
         logToFile("[Database] Writing settings %s (size=%i)\n", s_data, std::strlen(s_data));
+        logToFile("t3\n");
         if(WriteFile(handle_settings, 0, s_data, std::strlen(s_data), WriteOption::Flush).IsFailure()) {
             logToFile("[Database] Could not write into settings file\n");
+        } else {
+            logToFile("t4\n");
         }
 
         CloseFile(handle_settings);

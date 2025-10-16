@@ -38,8 +38,8 @@ constexpr u64 DefaultPin[] = { HidNpadButton_A, HidNpadButton_A, HidNpadButton_A
 
 namespace alefbet::pctrl::srv {       
 
-    PctrlService::PctrlService(Ipc::Server* ipcServer/*, u8* heap_pointer*/)
-    : ipcServer_(ipcServer)/*, heap_pointer_(heap_pointer)*/ {
+    PctrlService::PctrlService(Ipc::Server* ipcServer)
+    : ipcServer_(ipcServer) {
         logToFile("[Service] Starting service\n");        
         ipcServer_->setRequestHandler([this](Ipc::Request * r) -> uint32_t {
             return static_cast<uint32_t>(this->commandThread(r));
@@ -51,10 +51,7 @@ namespace alefbet::pctrl::srv {
         logToFile("[Service] Shared font loaded\n");
     }    
 
-    PctrlService::~PctrlService() {
-        /*if(ipcServer_) {
-            delete ipcServer_;
-        }*/
+    PctrlService::~PctrlService() {        
     }
 
     namespace actions {
@@ -245,29 +242,44 @@ namespace alefbet::pctrl::srv {
         return Ipc::Result::Ok;
     }
 
-    Ipc::Result PctrlService::setUserLimits(const u32& limit_in_minutes) {
+    Ipc::Result PctrlService::setUserLimits(Ipc::Request* request) {
         // Now the limit is global not per user so we don't use the first argument
+        u16 limit_in_minutes;
+        Ipc::Result rc = request->readRequestData(limit_in_minutes);
+        if(rc != Ipc::Result::Ok) {
+            logToFile("[Service] Could not read request data (limit)\n");
+            return rc;
+        }
 
         auto settings = loadSettings();
 
-        Setting setting;        
-        setting.key = SETTING_DAILY_LIMIT_GLOBAL;
-        setting.type = INTEGER;
-        setting.int_value = limit_in_minutes;
+        Setting setting {        
+            .key = SETTING_DAILY_LIMIT_GLOBAL,
+            .type = INTEGER,
+            .int_value = limit_in_minutes
+        };
 
         saveSetting(settings, setting);
 
         return Ipc::Result::Ok;
     }
 
-    Ipc::Result PctrlService::setAdminPin(const std::string& pin) {
+    Ipc::Result PctrlService::setAdminPin(Ipc::Request* request) {
+        std::string pin;
+        Ipc::Result rc = request->readRequestData(pin);
+        if(rc != Ipc::Result::Ok) {
+            logToFile("[Service] Could not read request data (PIN)\n");
+            return rc;
+        }
+
         logToFile("[Service] Setting admin PIN to %s", pin);
         auto settings = loadSettings();
         
-        Setting settingPin;
-        settingPin.type = STRING;
-        settingPin.string_value = pin;
-        settingPin.key = SETTING_ADMIN_PIN;
+        Setting settingPin {
+            .key = SETTING_ADMIN_PIN,
+            .type = STRING,
+            .string_value = pin
+        };
 
         saveSetting(settings, settingPin);
 
@@ -295,9 +307,75 @@ namespace alefbet::pctrl::srv {
         return Ipc::Result::Ok;
     }
 
+
+    Ipc::Result PctrlService::setWorkingMode(Ipc::Request* request) {
+        WorkingMode workingMode = WorkingModeInfo;
+        Ipc::Result rc = request->readRequestValue(workingMode);
+        if(rc != Ipc::Result::Ok) {
+            logToFile("[Service] Could not read request data (working mode)\n");
+            return Ipc::Result::BadInput;
+        }
+
+        auto settings = loadSettings();
+        auto setting = Setting{
+            .key = SETTING_WORKING_MODE,
+            .type = INTEGER,
+            .int_value = (u64)workingMode
+        };
+
+        saveSetting(settings, setting);
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::getWorkingMode(Ipc::Request* request) {
+        auto settings = loadSettings();
+
+        if(!settings.contains(SETTING_WORKING_MODE)) {
+            logToFile("[Service] The setting %s is not defined.\n", SETTING_WORKING_MODE);
+            request->appendReplyValue(WorkingModeInfo);
+        } else {
+            request->appendReplyValue(settings[SETTING_WORKING_MODE].int_value);
+        }
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::setShowRemainingTime(Ipc::Request* request) {
+        bool showRemainingTime = false;
+        Ipc::Result rc = request->readRequestValue(showRemainingTime);
+        if(rc != Ipc::Result::Ok) {
+            logToFile("[Service] Could not read data (set show remaining time)\n");
+            return Ipc::Result::BadInput;
+        }
+        
+        auto settings = loadSettings();
+        auto setting = Setting{
+            .key = SETTING_SHOW_REMAINING_TIME,
+            .type = INTEGER,
+            .int_value = showRemainingTime ? (u64)1 : (u64)0
+        };
+
+        saveSetting(settings, setting);
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::getShowRemainingTime(Ipc::Request* request) {
+        auto settings = loadSettings();
+
+        if(!settings.contains(SETTING_SHOW_REMAINING_TIME)) {
+            logToFile("[Service] The setting %s is not defined.\n", SETTING_SHOW_REMAINING_TIME);
+            request->appendReplyValue(0);
+        } else {
+            request->appendReplyValue(settings[SETTING_SHOW_REMAINING_TIME].int_value);
+        }
+
+        return Ipc::Result::Ok;
+    }
+
     Ipc::Result PctrlService::commandThread(Ipc::Request* request) {
         logToFile("[Service] request received: CmdId=%i\n", request->cmd());
-        Ipc::Result rc;
 
         switch (static_cast<Ipc::Command>(request->cmd())) {            
             case Ipc::Command::Test: {
@@ -322,36 +400,25 @@ namespace alefbet::pctrl::srv {
             case Ipc::Command::GetRunningApplication: {
                 return getRunningApplication(request);
             }
-            case Ipc::Command::SetUserLimits: {
-                /*std::string username;
-                rc = request->readRequestData(username);
-                if(rc != Ipc::Result::Ok) {
-                    logToFile("[Service] Could not read request data (username)\n");
-                    break;
-                }*/
-                u32 dailyLimitInMinutes = 0;
-                /*rc = request->readRequestValue(dailyLimitInMinutes);
-                if(rc != Ipc::Result::Ok) {
-                    logToFile("[Service] Could not read request data (daily limit)\n");
-                }*/
-                return setUserLimits(dailyLimitInMinutes);
+            case Ipc::Command::SetUserLimits: {                           
+                return setUserLimits(request);
             }
-            case Ipc::Command::SetAdminPin: {
-                std::string pin;
-                rc = request->readRequestData(pin);
-                if(rc != Ipc::Result::Ok) {
-                    logToFile("[Service] Could not read request data (PIN)\n");
-                }
-                return setAdminPin(pin);
+            case Ipc::Command::SetAdminPin: {                
+                return setAdminPin(request);
             }
             case Ipc::Command::VerifyAdminPin: {                
                 return verifyAdminPin(request);
+            }
+            case Ipc::Command::SetWorkingMode: {
+                return setWorkingMode(request);
+            }
+            case Ipc::Command::SetShowRemainingTime: {
+                return setShowRemainingTime(request);
             }
             default: {
                 logToFile("[Service] command %i not handled.\n", request->cmd());                
                 return Ipc::Result::UnknownCommand;
             }
-
         }        
 
         return Ipc::Result::Ok;

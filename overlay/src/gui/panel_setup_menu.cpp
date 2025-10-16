@@ -32,11 +32,18 @@ tsl::elm::Element* SetupMenuPanel::createUI() {
 void SetupMenuPanel::rebuildUI() {
 
     // Enable parental control
-    auto entryEnabled = new tsl::elm::ToggleListItem("Enabled", AppContext().is_ready);
+    auto entryEnabled = new tsl::elm::ToggleListItem("Enabled", getAppContext().is_enabled);
     rootList_->addItem(entryEnabled);        
-    entryEnabled->setStateChangedListener([] (bool on) {
-        logToFile("[Overlay] enable/disable not implemented;");
-        return true;
+    entryEnabled->setClickListener([entryEnabled] (u64 keys) -> bool {
+        if(keys & HidNpadButton_A) {
+            bool res = ipc::setEnabled(entryEnabled->getState());
+            if(!res) {
+                entryEnabled->setState(!entryEnabled->getState());
+            }
+            return true;
+        }
+
+        return false;
     });
 
     // Setup PIN
@@ -68,8 +75,8 @@ void SetupMenuPanel::rebuildUI() {
         return false;
     });
 
-    const auto& remainingTimeVisibility = ipc::getShowRemainingTime();
-    auto entryShowRemainingTime = new tsl::elm::ToggleListItem("Working mode", remainingTimeVisibility);
+    /*const auto& remainingTimeVisibility = ipc::getShowRemainingTime();
+    auto entryShowRemainingTime = new tsl::elm::ToggleListItem("Remaining time visible", remainingTimeVisibility);
     rootList_->addItem(entryShowRemainingTime);
     entryShowRemainingTime->setClickListener([entryShowRemainingTime](u64 keys) -> bool {
         if(keys & HidNpadButton_A) {            
@@ -81,7 +88,7 @@ void SetupMenuPanel::rebuildUI() {
         }
 
         return false;
-    });
+    });*/
 
     // Show remaining time
     

@@ -2,8 +2,9 @@
 #include <switch.h>
 
 struct AppContext {
-    bool is_ready = false;
+    bool is_enabled = false;    
     Service pctrl_service;
+    bool is_debug = true;
 };
 
 AppContext& getAppContext();

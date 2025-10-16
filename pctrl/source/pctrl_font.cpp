@@ -15,10 +15,8 @@
  */
 #include <stratosphere.hpp>
 #include "pctrl_font.hpp"
-#include "logger.h"
 
 using namespace ams;
-using namespace alefbet::pctrl::logger;
 
 namespace alefbet::pctrl::font {
 
@@ -29,9 +27,7 @@ namespace alefbet::pctrl::font {
     }
 
     void *AllocateForFont(size_t size) {
-        void *heap = lmem::AllocateFromExpHeap(g_font_heap_handle, size);
-
-        return heap;
+        return lmem::AllocateFromExpHeap(g_font_heap_handle, size);
     }
 
     void DeallocateForFont(void *p) {
@@ -58,6 +54,7 @@ namespace alefbet::pctrl::font {
 #undef  STBTT_assert
 
 /* Define color conversion macros. */
+#define RGB888_TO_RGB565(r, g, b) ((((r >> 3) << 11) & 0xF800) | (((g >> 2) << 5) & 0x7E0) | ((b >> 3) & 0x1F))
 #define RGB565_GET_R8(c) ((((c >> 11) & 0x1F) << 3) | ((c >> 13) & 7))
 #define RGB565_GET_G8(c) ((((c >> 5) & 0x3F) << 2) | ((c >> 9) & 3))
 #define RGB565_GET_B8(c) ((((c >> 0) & 0x1F) << 3) | ((c >> 2) & 7))
@@ -246,16 +243,13 @@ namespace alefbet::pctrl::font {
         g_cur_y += static_cast<u32>(g_font_line_pixels * num_lines);
     }
 
-    void ConfigureFontFramebuffer(u16 *fb, u32 (*unswizzle_func)(u32, u32)) {        
+    void ConfigureFontFramebuffer(u16 *fb, u32 (*unswizzle_func)(u32, u32)) {
         g_frame_buffer = fb;
         g_unswizzle_func = unswizzle_func;
     }
 
     Result InitializeSharedFont() {
-        ::Result rc = plGetSharedFontByType(std::addressof(g_font), PlSharedFontType_Standard);
-        if(rc != 0) {
-            logToFile("[Font] font initialization failed\n");
-        }
+        R_TRY(plGetSharedFontByType(std::addressof(g_font), PlSharedFontType_Standard));
 
         u8 *font_buffer = reinterpret_cast<u8 *>(g_font.address);
         stbtt_InitFont(std::addressof(g_stb_font), font_buffer, stbtt_GetFontOffsetForIndex(font_buffer, 0));

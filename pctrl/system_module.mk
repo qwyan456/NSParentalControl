@@ -92,6 +92,7 @@ $(ATMOSPHERE_OUT_DIR) $(ATMOSPHERE_BUILD_DIR):
 clean:
 	@echo clean ...
 	@rm -fr $(ATMOSPHERE_OUT_DIR) $(ATMOSPHERE_BUILD_DIR)
+	rm $(ATMOSPHERE_OUT_DIR)/exefs.nsp
 
 
 #---------------------------------------------------------------------------------
