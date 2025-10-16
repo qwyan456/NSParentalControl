@@ -283,4 +283,22 @@ namespace alefbet::pctrl::ipc {
 
         return enabled == 1 ? true : false;
     }
+ 
+    std::string getVersion() {
+        logToFile("[IPC] Getting sysmodule version");
+
+        char version[10] = {0};
+
+        Service service = getAppContext().pctrl_service;
+        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::Version, version);
+
+        if(R_FAILED(res)) {
+            logToFile("[IPC] An error occured while getting the sysmodule version.");
+        } 
+
+        logToFile("[IPC] Sysmodule version is");
+        logToFile(version);
+
+        return std::string(version);
+    }
 }

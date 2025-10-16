@@ -1,10 +1,8 @@
 # NS Parental Control
 
-⚠️ **Warning**: This is a proof of concept in development.
+⚠️ **Warning**: This is a proof of concept under development.
 
-NS Parental Control is a simple app that allows parents to set limits on their children’s use of the Nintendo Switch console.
-
-*This is a proof-of-concept of an app and was made only for experimenting app development on the Nintendo Switch.* 
+NS Parental Control is a simple parental control system for the Nintendo Switch which does not require Internet access or a smartphone to operate.
 
 It can be used freely.
 
@@ -12,32 +10,28 @@ It can be used freely.
 
 1.0.0 (MVP)
 
+## Users categories
+
+The following users are involved:
+- Gamers: the persons who want to play games.
+- Administrator: the person who defines the rules and sets the limits.
+
 ## Current features 
 
 Parental control has the following features:
-- Set a daily limit for all users [PIN needed]. 
-  - Each user has its own game time but it is defined the same for all users. 
-  - The time limit is for all games.
-- Set the parental access code (PIN).
-- Show the remaining time (user).
 
-[] overlay: set admin PIN
-[] overlay: unlock settings with admin PIN
-[] overlay: set the daily limit
-[] overlay: show the daily limit
-[] overlay: show the current usage
-[] sysmodule: provide functions to the overlay
-  [] set the daily limit
-  [] get the daily limit
-  [] get users list
-  [] get user's current usage
+**Gamers**
+- Check the played time
+- Check the remaining play time
+- When the time is out, the system is blocked
+
+**Administrator** (protected by a PIN code)
+- Define a PIN to protect setup access
+- Enable or disable the parental control
 
 ## Coming features
 
-The following features are in the backlog:
-- Set a daily limit for users individually.
-- Set a daily limit for each game, for each user.
-- Show the remaining time for each game, for each user.
+Coming features are in the project page.
 
 ## Licence
 

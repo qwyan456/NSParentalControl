@@ -31,4 +31,6 @@ namespace alefbet::pctrl::ipc {
     bool getShowRemainingTime();
     bool isEnabled();
     bool setEnabled(const bool&);
+
+    std::string getVersion();
 }

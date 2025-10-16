@@ -4,6 +4,7 @@
 #include <switch.h>
 #include "Command.hpp"
 #include "AppContext.h"
+#include "version.h"
 #include "helpers/ipc_helpers.h"
 #include "panel_setuppin.h"
 #include "panel_main_menu.h"
@@ -19,7 +20,7 @@ SetupMenuPanel::~SetupMenuPanel() {
 void SetupMenuPanel::closeAndClean() {
 }
 
-tsl::elm::Element* SetupMenuPanel::createUI() {
+tsl::elm::Element* SetupMenuPanel::createUI() {        
     rootFrame_ = new tsl::elm::OverlayFrame("Parental Control", "Setup");
     rootList_ = new tsl::elm::List();
     
@@ -74,6 +75,10 @@ void SetupMenuPanel::rebuildUI() {
 
         return false;
     });
+
+    rootList_->addItem(new tsl::elm::CategoryHeader("Versions"));
+    rootList_->addItem(new tsl::elm::ListItem("Overlay", VERSION));
+    rootList_->addItem(new tsl::elm::ListItem("Sysmodule", ipc::getVersion()));
 
     /*const auto& remainingTimeVisibility = ipc::getShowRemainingTime();
     auto entryShowRemainingTime = new tsl::elm::ToggleListItem("Remaining time visible", remainingTimeVisibility);
