@@ -71,6 +71,8 @@ Here are the files and their destination:
 | toolbox.json | /atmosphere/contents/420000000003103 |
 | parental_control.ovl | /switch/.overlays |
 
+After copying the files, reboot the console.
+
 ## Build and install
 
 This section explains how to create and install the binary for NS Parental Control.
