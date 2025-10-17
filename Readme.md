@@ -59,13 +59,17 @@ Libraries linked or code reused:
 
 ## Installation
 
-Download the latest release from [GitHub]().
+1. Install the required [**Tesla Menu**](https://switch.hacks.guide/homebrew/tesla-menu.html).
 
-Unzip the file. It contains both the sysmodule in the folder `sysmodule` and the overlay in the folder `overlay`.
+2. Download the latest release from [GitHub](https://github.com/TristanIsrael/NSParentalControl/releases/tag/1.0).
 
-The sysmodule folder contains another folder named `0420000000003103`. It must be copied in the folder `/atmosphere/contents/` on the Switch (SD Card preferably).
+Here are the files and their destination:
 
-The overlay folder's content (`parental_control.ovl` and `parental_control.json` files) must be copied into the folder `/switch/.overlays/` on the Switch (SD Card preferably).
+| File | Destination |
+|--|--|
+| exefs.nsp | /atmosphere/contents/420000000003103 |
+| toolbox.json | /atmosphere/contents/420000000003103 |
+| parental_control.ovl | /switch/.overlays |
 
 ## Build and install
 
@@ -114,7 +118,7 @@ At the end of the build, the sysmodule is available in the directory `<Atmospher
 
 Rename it to `exefs.nsp`.
 
-This file should be copied in the directory `/atmosphere/contents/0420000000003103` of the SD card of the Switch.
+This file should be copied in the directory `/atmosphere/contents/420000000003103` of the SD card of the Switch.
 
 ### Build the ovverlay
 
@@ -126,9 +130,9 @@ Copy this file in the directory `/switch/.overlays/` in the SD card of the Switc
 
 ### Auto-start Parental Control
 
-In order for the parental control to load on startup you have to create a new folder named `flags` into `/atmosphere/contents/0420000000003103`. 
+In order for the parental control to load on startup you have to create a new folder named `flags` into `/atmosphere/contents/420000000003103`. 
 
-In this folder create an empty file named `TO COMPLETE`.
+In this folder create an empty file named `boot2.flag`
 
 ## References
 
