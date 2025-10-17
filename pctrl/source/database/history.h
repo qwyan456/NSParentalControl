@@ -1,0 +1,51 @@
+#pragma once
+#include <memory>
+#include <string>
+#include <vector>
+#include <switch.h>
+
+class HistoryEntryData {
+public:    
+    AccountUid uid = {0};
+    std::string date;
+    u64 titleId = 0;
+    u16 durationInMinutes = 0;
+};
+
+class HistoryEntry {
+public:    
+    HistoryEntry() {}
+    HistoryEntry(AccountUid uid, std::string date, u64 titleId, u16 durationInMinutes);
+    HistoryEntry(const HistoryEntry& orig);
+    HistoryEntry& operator=(const HistoryEntry& orig);
+
+    bool isValid() const;
+    AccountUid uid() const;
+    std::string uidAsString() const;
+    std::string date() const;
+    u64 titleId() const;
+    u16 durationInMinutes() const;
+    void setDurationInMinutes(u16 duration);
+
+private:
+    std::shared_ptr<HistoryEntryData> d_;
+};
+
+class HistoryData {
+public:
+    std::vector<HistoryEntry> history;
+};
+
+class History {
+public:
+    History();
+    History(const History&);
+    History& operator=(const History&);
+    
+    void addEntry(const HistoryEntry& entry);
+    std::vector<HistoryEntry> entries() const;
+    std::vector<HistoryEntry> entries(const AccountUid& uid, const std::string& date, const u64& titleId = 0) const;
+
+private:
+    std::shared_ptr<HistoryData> d_;    
+};

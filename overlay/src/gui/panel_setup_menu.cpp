@@ -8,6 +8,7 @@
 #include "helpers/ipc_helpers.h"
 #include "panel_setuppin.h"
 #include "panel_main_menu.h"
+#include "panel_setup_limits.h"
 
 using namespace alefbet::pctrl;
 
@@ -76,9 +77,21 @@ void SetupMenuPanel::rebuildUI() {
         return false;
     });
 
+    // Setup limits
+    auto entryLimits = new tsl::elm::ListItem("Setup limits");
+    rootList_->addItem(entryLimits);
+    entryLimits->setClickListener([](u64 keys) -> bool {
+        if(keys & HidNpadButton_A) {
+            tsl::changeTo<SetupLimitsPanel>();
+            return true;
+        }
+        
+        return false;
+    });
+
     rootList_->addItem(new tsl::elm::CategoryHeader("Versions"));
     rootList_->addItem(new tsl::elm::ListItem("Overlay", VERSION));
-    rootList_->addItem(new tsl::elm::ListItem("Sysmodule", ipc::getVersion()));
+    rootList_->addItem(new tsl::elm::ListItem("Sysmodule", ipc::getVersion()));    
 
     /*const auto& remainingTimeVisibility = ipc::getShowRemainingTime();
     auto entryShowRemainingTime = new tsl::elm::ToggleListItem("Remaining time visible", remainingTimeVisibility);

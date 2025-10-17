@@ -16,7 +16,9 @@
 #pragma once
 #include <stratosphere.hpp>
 
-namespace alefbet::pctrl::font {
+#define RGB888_TO_RGB565(r, g, b) ((((r >> 3) << 11) & 0xF800) | (((g >> 2) << 5) & 0x7E0) | ((b >> 3) & 0x1F))
+
+namespace alefbet::pctrl::font {    
 
     using Result = ams::Result;
 

@@ -14,34 +14,62 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #pragma once
-#include <stratosphere.hpp>
+#include <switch.h>
+#include <vector>
+#include "ipc/Server.hpp"
 #include "pctrl_screen.hpp"
-#include "pctrl_i_service.hpp"
 
 namespace alefbet::pctrl::srv {
 
-    using Result = ams::Result;
-    using NxResult = u32; 
+    class Monitor;
     constexpr SmServiceName service_name_ = smEncodeName("pctrl");    
 
     class PctrlService {
         public:
-            PctrlService();
-            void Listen();            
-            void CloseAndClean();
+            PctrlService(Ipc::Server* ipcServer);
+            ~PctrlService();
+            
+            void listen();
+            GuiController&& gui() {
+                return std::move(gui_);
+            }
+
+            void setMonitor(Monitor* monitor) {
+                monitor_ = monitor;
+            }
 
         private:
-            void ShowScreenTimeout();
+            Ipc::Result commandThread(Ipc::Request*);
+
+            // Handlers
+            void showScreenTimeout();
+            Ipc::Result getRunningApplication(Ipc::Request*);
+            Ipc::Result getCurrentUserUid(Ipc::Request*);
+            Ipc::Result getCurrentUserNickname(Ipc::Request*);
+            Ipc::Result getUsersList(Ipc::Request*);
+            Ipc::Result getUserUsageTime(Ipc::Request*);
+            Ipc::Result getUserRemainingTime(Ipc::Request*);
+            Ipc::Result setUserLimits(Ipc::Request*);
+            Ipc::Result setAdminPin(Ipc::Request*);
+            Ipc::Result verifyAdminPin(Ipc::Request*);
+            Ipc::Result setWorkingMode(Ipc::Request*);
+            Ipc::Result getWorkingMode(Ipc::Request*);
+            Ipc::Result setShowRemainingTime(Ipc::Request*);
+            Ipc::Result getShowRemainingTime(Ipc::Request*);
+            Ipc::Result isEnabled(Ipc::Request*);
+            Ipc::Result setEnabled(Ipc::Request*);
+            Ipc::Result getCurrentVersion(Ipc::Request*);
+            Ipc::Result getDailyLimit(Ipc::Request*);
+            Ipc::Result setDailyLimit(Ipc::Request*);
 
         private:
             bool is_ready_ = false;
+            bool session_opened_ = false;
+            Ipc::Server *ipcServer_ = nullptr;
+            GuiController gui_;
+            bool enabled_ = true;
+            Monitor* monitor_ = nullptr;
     };
-
-    class Service {
-        public:
-            void Ping(void);
-    };
-    static_assert(alefbet::pctrl::srv::IsIService<Service>);
 
 }
 

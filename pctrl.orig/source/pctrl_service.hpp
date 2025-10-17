@@ -14,50 +14,34 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #pragma once
-#include <switch.h>
-#include <vector>
-#include "ipc/Server.hpp"
+#include <stratosphere.hpp>
 #include "pctrl_screen.hpp"
+#include "pctrl_i_service.hpp"
 
 namespace alefbet::pctrl::srv {
 
+    using Result = ams::Result;
+    using NxResult = u32; 
     constexpr SmServiceName service_name_ = smEncodeName("pctrl");    
 
     class PctrlService {
         public:
-            PctrlService(Ipc::Server* ipcServer);
-            ~PctrlService();
-            
-            void listen();
-            GuiController&& gui() {
-                return std::move(gui_);
-            }
+            PctrlService();
+            void Listen();            
+            void CloseAndClean();
 
         private:
-            Ipc::Result commandThread(Ipc::Request*);
-
-            // Handlers
-            void showScreenTimeout();
-            Ipc::Result getRunningApplication(Ipc::Request*);
-            Ipc::Result getCurrentUserUid(Ipc::Request*);
-            Ipc::Result getCurrentUserNickname(Ipc::Request*);
-            Ipc::Result getUsersList(Ipc::Request*);
-            Ipc::Result getUserUsageTime(Ipc::Request*);
-            Ipc::Result getUserRemainingTime(Ipc::Request*);
-            Ipc::Result setUserLimits(Ipc::Request*);
-            Ipc::Result setAdminPin(Ipc::Request*);
-            Ipc::Result verifyAdminPin(Ipc::Request*);
-            Ipc::Result setWorkingMode(Ipc::Request*);
-            Ipc::Result getWorkingMode(Ipc::Request*);
-            Ipc::Result setShowRemainingTime(Ipc::Request*);
-            Ipc::Result getShowRemainingTime(Ipc::Request*);
+            void ShowScreenTimeout();
 
         private:
             bool is_ready_ = false;
-            bool session_opened_ = false;
-            Ipc::Server *ipcServer_ = nullptr;
-            GuiController gui_;
     };
+
+    class Service {
+        public:
+            void Ping(void);
+    };
+    static_assert(alefbet::pctrl::srv::IsIService<Service>);
 
 }
 

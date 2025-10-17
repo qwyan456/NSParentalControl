@@ -1,16 +1,19 @@
 #include "panel_main_menu.h"
-#include "version.h"
-#include "logger.h"
 #include <tesla.hpp>
 #include <switch.h>
+#include <chrono>
+#include "version.h"
+#include "logger.h"
 #include "Command.hpp"
 #include "panel_debug_menu.h"
 #include "panel_setup_menu.h"
 #include "panel_verifypin.h"
+#include "panel_setup_limits.h"
 #include "AppContext.h"
 #include "helpers/ipc_helpers.h"
 
 using namespace alefbet::pctrl;
+using namespace std::chrono;
 
 MainMenuPanel::MainMenuPanel() {    
 }
@@ -51,7 +54,7 @@ void MainMenuPanel::rebuildUI() {
     logToFile("title=");
     logToFile(currentTitle.c_str());
 
-    if(!currentTitle.empty()) {
+    if(!currentTitle.empty() && !currentTitle.starts_with("Err#")) {
         auto currentUserUid = ipc::getCurrentUserUid();
         logToFile("user id=");
         logToFile(currentUserUid.c_str());
@@ -68,13 +71,19 @@ void MainMenuPanel::rebuildUI() {
         rootList_->addItem(entryTitle);
 
         // Usage time        
-        auto usageTime = ipc::getUserUsageTime();        
-        auto entryUsageTime = new tsl::elm::ListItem("Usage: " +std::to_string(usageTime) +" mn");
+        auto usageTimeInMinutes = ipc::getUserUsageTime();
+        auto durationInMinutes = minutes{usageTimeInMinutes};
+        auto hoursPart = duration_cast<hours>(durationInMinutes);
+        auto minutesPart = duration_cast<minutes>(durationInMinutes - hoursPart);
+        auto entryUsageTime = new tsl::elm::ListItem("Usage: " +(hoursPart.count() > 0 ? std::to_string(hoursPart.count()) + "h " : "") +std::to_string(minutesPart.count()) +" mn");
         rootList_->addItem(entryUsageTime);
 
         // Remaining time
         auto remainingTime = ipc::getUserRemainingTime();
-        auto entryRemainingTime = new tsl::elm::ListItem("Remaining: " +std::to_string(remainingTime) +" mn");
+        durationInMinutes = minutes{remainingTime};
+        hoursPart = duration_cast<hours>(durationInMinutes);
+        minutesPart = duration_cast<minutes>(durationInMinutes - hoursPart);
+        auto entryRemainingTime = new tsl::elm::ListItem("Remaining: " +(hoursPart.count() > 0 ? std::to_string(hoursPart.count()) + "h " : "") +std::to_string(minutesPart.count()) +" mn");
         rootList_->addItem(entryRemainingTime);
 
     } else {
@@ -101,6 +110,7 @@ void MainMenuPanel::rebuildUI() {
     entrySetupMenu->setClickListener([this](u64 keys) {
         if(keys & HidNpadButton_A) {
             tsl::changeTo<VerifyPinPanel, NextPanel>(PanelSetupMenu);
+            //tsl::changeTo<SetupLimitsPanel>();
             return true;
         }
 

@@ -14,236 +14,538 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <switch.h>
+#include <thread>
+#include <cstring>
+#include <map>
 #include "pctrl_service.hpp"
-#include "pctrl_protocol.h"
-#include "pctrl_screen.hpp"
+#include "pctrl_font.hpp"
 #include "logger.h"
+#include "ipc/Command.hpp"
+#include "ipc/Result.hpp"
+#include "pctrl_screen.hpp"
+#include "helpers.h"
+#include "database/settings.h"
+#include "database/database.h"
+#include "version.h"
+#include "pctrl_monitor.h"
 
-using namespace ams;
+//#define PSEC_DEBUG 1
+
 using namespace alefbet::pctrl::logger;
+using namespace alefbet::pctrl::database;
+using namespace alefbet::pctrl::helpers;
+constexpr std::string NullString = std::string("(NULL)");
+constexpr u64 DefaultPin[] = { HidNpadButton_A, HidNpadButton_A, HidNpadButton_A, HidNpadButton_A };
 
-namespace alefbet::pctrl::srv {  
-    static os::ThreadType s_thread;
-    static Handle s_service_handle;
-    //static TipcService s_service;     
+namespace alefbet::pctrl::srv {       
 
-    PctrlService::PctrlService() 
-    {}    
+    PctrlService::PctrlService(Ipc::Server* ipcServer)
+    : ipcServer_(ipcServer) {
+        logToFile("[Service] Starting service\n");        
+        ipcServer_->setRequestHandler([this](Ipc::Request * r) -> uint32_t {
+            return static_cast<uint32_t>(this->commandThread(r));
+        });
+        logToFile("[Service] service started\n");
 
-    static constexpr size_t StackSize = 0x8000;
-    static_assert(util::IsAligned(StackSize, os::MemoryPageSize), "StackSize alignment");
-    alignas(os::MemoryPageSize) u8 m_stack_mem[StackSize] = {};
-    static bool canRun = true;
-    
-    sf::hipc::ServerManager<1, sf::hipc::DefaultServerManagerOptions, 1> g_server_manager;
-    constinit sf::UnmanagedServiceObject<pctrl::srv::IService, pctrl::srv::Service> g_user_service_object;
-    
-    namespace handlers {
+        /* Load shared font. */
+        alefbet::pctrl::font::InitializeSharedFont();
+        logToFile("[Service] Shared font loaded\n");
 
-        void ShowScreenTimeout() {        
-            s_gui.ShowScreenTimeout();
+        /* Verify whether the service is enabled */
+        auto settings = loadSettings();
+
+        if(settings.contains(SETTING_ENABLED)) {
+            const auto setting = settings[SETTING_ENABLED];
+            enabled_ = setting.int_value > 0;
         }
+    }    
 
-        void AnswerToPing() {      
-            HipcMetadata meta = { 0 };
-            meta.type = CmifCommandType_Request;
-            meta.num_data_words = (sizeof(CmifOutHeader) + 0x10) / 4;
+    PctrlService::~PctrlService() {        
+    }
 
-            void* base = armGetTls();
-            HipcRequest req = hipcMakeRequest(base, meta);
-            CmifOutHeader* rawHeader = (CmifOutHeader*)cmifGetAlignedDataStart(req.data_words, base);
+    namespace actions {        
 
-            rawHeader->magic = CMIF_OUT_HEADER_MAGIC;
-            rawHeader->result = 0;
-            rawHeader->token = 0;
+        void reboot_to_payload(void) {
+            helpers::rebootToPayload();
+        }
+        
+    }
+
+    void PctrlService::showScreenTimeout() {        
+        logToFile("[Service] Test requested\n");        
+
+        // Block unless a button has been pressed
+        PadState pad;
+        padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+        padInitializeAny(&pad);
+
+        gui_.ShowScreenTimeout();
+
+        while(true) {
+            padUpdate(&pad);
+            u64 kDown = padGetButtonsDown(&pad);
+        
+            if(kDown & HidNpadButton_Minus) {
+                logToFile("[Service] User wants to shutdown\n");
+                #ifdef PSEC_DEBUG
+                    // In debug mode we only hide the screen
+                    gui_.HideScreen();
+                #else 
+                    // Otherwise we shut the system down
+                    actions::reboot_to_payload();
+                #endif
+
+                return; //Stop monitoring the buttons
+            }
+
+            svcSleepThread(100'000);
         }
     }
 
-    /*static void threadFunc(void*) {
-        logToFile("[Service] Wait for requests...\n");
-        while(auto* signaled_holder = g_server_manager.WaitSignaled()) {
-            g_server_manager.Process(signaled_holder);
+    Ipc::Result PctrlService::getRunningApplication(Ipc::Request* request) {
+        auto process_id = helpers::getRunningApplicationPid();
+        if(process_id > 0) {
+            auto title_id = helpers::getRunningApplicationTitleId(process_id);
+            auto app_name = helpers::getApplicationName(title_id);
+            request->appendReplyValue(app_name);
+        } else {
+            request->appendReplyValue(NullString);
+        }
+        
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::getCurrentUserUid(Ipc::Request* request) {   
+        const auto current_title = helpers::getRunningApplicationPid();        
+        if(current_title == 0) {
+            // If there is no title we don"t query on user
+            request->appendReplyValue(NullString);
+            return Ipc::Result::Ok;
+        } 
+
+        const auto current_user = helpers::getCurrentUser();
+        if(current_user.isValid()) {
+            request->appendReplyValue(accountUidToString(current_user.uid));
+        } else {
+            request->appendReplyValue(NullString);
         }
 
+        return Ipc::Result::Ok;
+    }
 
-        logToFile("[Service] task started\n");
+    Ipc::Result PctrlService::getCurrentUserNickname(Ipc::Request* request) {    
+        const auto current_title = helpers::getRunningApplicationPid();        
+        if(current_title == 0) {
+            // If there is no title we don"t query on user
+            request->appendReplyValue(NullString);
+            return Ipc::Result::Ok;
+        } 
 
-        NxResult rc;
-        bool has_answered = false;
-        canRun = true;
-
-        logToFile("[Service] Register service pctrl:u\n");
-        rc = smRegisterService(&s_service_handle, SmServiceName{"pctrl:u"}, true, 1);
-        if(rc != 0) {
-            logToFile("[Service] Registration failed\n");
-            return;
+        const auto current_user = helpers::getCurrentUser();
+        if(current_user.isValid()) {
+            logToFile("[Service] replying UID=%s\n", current_user.nickname.c_str());
+            request->appendReplyValue(current_user.nickname);
+        } else {
+            logToFile("[Service] replying UID=(NULL)\n");
+            request->appendReplyValue(NullString);
         }
 
-        while(canRun) {
-            logToFile("[Service] wait for a connection");
+        return Ipc::Result::Ok;
+    }
 
-            rc = waitSingleHandle(s_service_handle, -1);
-            if (R_FAILED(rc)) {
-                logToFile("[Service] Could not wait for the service handle sync\n");
-                return;
-            }
+    Ipc::Result PctrlService::getUsersList(Ipc::Request*) {
+        // Useful?
+        return Ipc::Result::Ok;
+    }
 
-            rc = svcReplyAndReceiveLight(s_service_handle);
-            if(R_FAILED(rc)) {
-                logToFile("[Service] Could not receive client request\n");
-                return;
-            }
+    Ipc::Result PctrlService::getUserRemainingTime(Ipc::Request* request) {
+        //const auto uidS = accountUidFromString(uid);
+        const auto user = helpers::getCurrentUser();
+        if(!user.isValid()) {
+            logToFile("[Service] There is no user\n");
+            request->appendReplyValue(0);
+            return Ipc::Result::Ok;
+        }
 
-            void* base = armGetTls();
-            HipcParsedRequest hipc = hipcParseRequest(base);
+        logToFile("[Service] Get usage time for user %s\n", user.nickname.c_str());
 
-            if (hipc.meta.type != CmifCommandType_Request) {
-                logToFile("[Service] this is not a request\n");
-                return;
-            }
+        const auto& date = today();
+        if(date.empty()) {
+            return Ipc::Result::Error;
+        }
 
-            CmifInHeader* header = (CmifInHeader*)cmifGetAlignedDataStart(hipc.data.data_words, base);
-            size_t dataSize = hipc.meta.num_data_words * 4;
+        const auto history = getHistory(user.uid, date);
+        auto usage_time_in_minutes = (u16)0;        
 
-            if (!header) {
-                logToFile("[Service] header is missing\n");
-                return;
-            }
+        // Compute the total usage for today 
+        for(const auto& entry: history) {
+            usage_time_in_minutes += entry.durationInMinutes();
+        }
 
-            if (dataSize < sizeof(CmifInHeader)) {
-                logToFile("[Service] header is malformed\n");
-                return;
-            }
-                
-            if (header->magic != CMIF_IN_HEADER_MAGIC) {
-                logToFile("[Service] header magic is wrong\n");
-                return;
-            }                
+        // Get the daily limit
+        auto settings = loadSettings();
+        const auto daily_limit = settings[SETTING_DAILY_LIMIT_GLOBAL].int_value;
+        s16 remaining_time_in_minutes = 0;
+        if(daily_limit > usage_time_in_minutes) {
+            remaining_time_in_minutes = daily_limit - usage_time_in_minutes;
+        }
 
-            dataSize = dataSize - sizeof(CmifInHeader);
-            //u8* data = dataSize ? ((u8*)header) + sizeof(CmifInHeader) : NULL;
+        logToFile("[Service] User=%s, usage=%i minutes, remaining=%i minutes\n", user.nickname.c_str(), usage_time_in_minutes, remaining_time_in_minutes);
 
-            switch ((PctrlCommands)header->command_id) {
-                case CmdGetRemainingTime:
-                    logToFile("[Service] Command received: get remaining time\n");
-                    break;
-                case CmdPing:     
-                    logToFile("[Service] Command received: Ping\n");   
-                    handlers::AnswerToPing();
-                    has_answered = true;
-                    break;
-                case CmdTestTimeout:
-                    logToFile("[Service] Command received: test timeout\n");
-                    handlers::ShowScreenTimeout();
-                    break;
-                default:
-                    logToFile("[Service] Command received: unknown or unhandled command\n");
-                    break;
-            }    
+        request->appendReplyValue(remaining_time_in_minutes);
 
-            // Send the response         
-            if(has_answered) {       
-                svcReplyAndReceiveLight(s_service_handle);
-                has_answered = false;
-            }   
-        }  
+        return Ipc::Result::Ok;
+    }
 
-        logToFile("[Service] stop waiting for request\n");
-    }*/
+    Ipc::Result PctrlService::getUserUsageTime(Ipc::Request* request) {
+        const auto user = helpers::getCurrentUser();
+        if(!user.isValid()) {
+            logToFile("[Service] There is no user\n");
+            return Ipc::Result::Ok;
+        }
 
-    struct Header {
-        u64 magic;
-        union {
-            u64 cmdId;
-            u64 result;
+        logToFile("[Service] Get remaining time for user %s\n", user.nickname.c_str());
+
+        const auto history = getHistory(user.uid, today());
+        auto usage_time_in_minutes = (u16)0;        
+
+        // Compute the total usage for today 
+        for(const auto& entry: history) {
+            usage_time_in_minutes += entry.durationInMinutes();
+        }
+
+        logToFile("[Service] User=%s, usage=%i minutes\n", user.nickname.c_str(), usage_time_in_minutes);
+
+        request->appendReplyValue(usage_time_in_minutes);
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::setUserLimits(Ipc::Request* request) {
+        // Now the limit is global not per user so we don't use the first argument
+        u16 limit_in_minutes;
+        Ipc::Result rc = request->readRequestData(limit_in_minutes);
+        if(rc != Ipc::Result::Ok) {
+            logToFile("[Service] Could not read request data (limit)\n");
+            return rc;
+        }
+
+        auto settings = loadSettings();
+
+        Setting setting {        
+            .key = SETTING_DAILY_LIMIT_GLOBAL,
+            .type = INTEGER,
+            .int_value = limit_in_minutes
         };
-    };
 
-    void PctrlService::Listen() {            
-        Result res = smRegisterService(&s_service_handle, service_name_, true, 1);
-        if(R_FAILED(res)) {
-            logToFile("[Service] The service registration failed: %i\n", res.GetValue());
-            smUnregisterService(service_name_);
-            return;            
+        saveSetting(settings, setting);
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::setAdminPin(Ipc::Request* request) {
+        //std::string pin;
+        //Ipc::Result rc = request->readRequestData(pin);
+        u64 pin[4] = {0};
+        
+        u64 val = 0;
+        Ipc::Result rc = Ipc::Result::Ok;
+        for(int i = 0 ; i < 4 ; i++) {
+             rc = request->readRequestValue(val);
+             if(rc == Ipc::Result::Ok) {
+                pin[i] = val;
+             } else {
+                break;
+             }
+        }
+
+        if(rc != Ipc::Result::Ok) {
+            logToFile("[Service] Could not read request data (PIN)\n");
+            return rc;
+        }
+
+        std::string s_pin = std::to_string(pin[0]) +"," +std::to_string(pin[1]) +"," +std::to_string(pin[2]) +"," +std::to_string(pin[3]);
+
+        logToFile("[Service] Setting admin PIN to %s", pin);
+        auto settings = loadSettings();
+        
+        Setting settingPin {
+            .key = SETTING_ADMIN_PIN,
+            .type = STRING,
+            .string_value = s_pin
+        };
+
+        saveSetting(settings, settingPin);
+
+        return Ipc::Result::Ok;        
+    }
+
+    Ipc::Result PctrlService::verifyAdminPin(Ipc::Request* request) {
+        //std::string pin;
+        u64 pin[4] = {0};
+        
+        u64 val = 0;
+        Ipc::Result rc = Ipc::Result::Ok;
+        for(int i = 0 ; i < 4 ; i++) {
+             rc = request->readRequestValue(val);
+             if(rc == Ipc::Result::Ok) {
+                pin[i] = val;
+             } else {
+                break;
+             }
+        }
+
+        if(rc != Ipc::Result::Ok) {
+            logToFile("[Service] Could not read request data (PIN)\n");
+            return Ipc::Result::BadInput;
+        }
+
+        std::string s_pin = std::to_string(pin[0]) +"," +std::to_string(pin[1]) +"," +std::to_string(pin[2]) +"," +std::to_string(pin[3]);
+
+        auto settings = loadSettings();
+
+        auto adminPin = settings[SETTING_ADMIN_PIN].string_value;
+        if(adminPin.empty()) {
+            adminPin = std::to_string(DefaultPin[0]) +"," +std::to_string(DefaultPin[1]) +"," +std::to_string(DefaultPin[2]) +"," +std::to_string(DefaultPin[3]);
+            logToFile("[Service] No PIN defined. Using default.\n");
+        }
+        logToFile("[Service] verify admin PIN. Recv=%s. ref=%s\n", s_pin.c_str(), adminPin.c_str());
+        request->appendReplyValue(adminPin == s_pin ? true : false);
+
+        return Ipc::Result::Ok;
+    }
+
+
+    Ipc::Result PctrlService::setWorkingMode(Ipc::Request* request) {
+        WorkingMode workingMode = WorkingModeInfo;
+        Ipc::Result rc = request->readRequestValue(workingMode);
+        if(rc != Ipc::Result::Ok) {
+            logToFile("[Service] Could not read request data (working mode)\n");
+            return Ipc::Result::BadInput;
+        }
+
+        auto settings = loadSettings();
+        auto setting = Setting{
+            .key = SETTING_WORKING_MODE,
+            .type = INTEGER,
+            .int_value = (u64)workingMode
+        };
+
+        saveSetting(settings, setting);
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::getWorkingMode(Ipc::Request* request) {
+        auto settings = loadSettings();
+
+        if(!settings.contains(SETTING_WORKING_MODE)) {
+            logToFile("[Service] The setting %s is not defined.\n", SETTING_WORKING_MODE);
+            request->appendReplyValue((u8)WorkingModeBlocking);
+        } else {
+            request->appendReplyValue((u8)settings[SETTING_WORKING_MODE].int_value);
+        }
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::setShowRemainingTime(Ipc::Request* request) {
+        bool showRemainingTime = false;
+        Ipc::Result rc = request->readRequestValue(showRemainingTime);
+        if(rc != Ipc::Result::Ok) {
+            logToFile("[Service] Could not read data (set show remaining time)\n");
+            return Ipc::Result::BadInput;
+        }
+        
+        auto settings = loadSettings();
+        auto setting = Setting{
+            .key = SETTING_SHOW_REMAINING_TIME,
+            .type = INTEGER,
+            .int_value = showRemainingTime ? (u64)1 : (u64)0
+        };
+
+        saveSetting(settings, setting);
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::getShowRemainingTime(Ipc::Request* request) {
+        auto settings = loadSettings();
+
+        if(!settings.contains(SETTING_SHOW_REMAINING_TIME)) {
+            logToFile("[Service] The setting %s is not defined.\n", SETTING_SHOW_REMAINING_TIME);
+            request->appendReplyValue(0);
+        } else {
+            request->appendReplyValue(settings[SETTING_SHOW_REMAINING_TIME].int_value);
+        }
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::isEnabled(Ipc::Request* request) {
+        logToFile("[Service] getting current service state: %i\n", enabled_);
+
+        request->appendReplyValue(enabled_ ? (u8)1 : (u8)0);
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::setEnabled(Ipc::Request* request) {        
+        bool isEnabled = false;        
+        Ipc::Result rc = request->readRequestValue(isEnabled);
+        logToFile("[Service] setting service state to %s\n", (isEnabled ? "enabled" : "disabled"));
+
+        if(rc != Ipc::Result::Ok) {
+            logToFile("[Service] Could not read data (enabled)\n");
+            return Ipc::Result::BadInput;
+        }
+
+        auto settings = loadSettings();
+        auto setting = Setting{
+            .key = SETTING_ENABLED,
+            .type = INTEGER,
+            .int_value = isEnabled ? (u64)1 : (u64)0
+        };
+
+        saveSetting(settings, setting);
+        enabled_ = isEnabled;
+
+        if(enabled_) {
+            monitor_->start();
+        } else {
+            monitor_->stop();
+        }
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::getDailyLimit(Ipc::Request* request) {
+        logToFile("[Service] Getting the daily limit\n");
+
+        auto settings = loadSettings();        
+        u16 limit_in_minutes = 0;
+        
+        if(settings.contains(SETTING_DAILY_LIMIT_GLOBAL)) {
+            limit_in_minutes = settings[SETTING_DAILY_LIMIT_GLOBAL].int_value;
+        }
+
+        request->appendReplyValue(limit_in_minutes);
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::setDailyLimit(Ipc::Request* request) {
+        logToFile("[Service] Setting the daily limit\n");
+
+        u16 limit = 0;
+        Ipc::Result rc = request->readRequestValue(limit);
+        if(rc != Ipc::Result::Ok) {
+            logToFile("[Service] Could not read the daily limit\n");
+            return Ipc::Result::BadInput;
         }        
 
-        logToFile("[Service] Service created\n");        
+        auto settings = loadSettings();
+        auto setting = Setting{
+            .key = SETTING_DAILY_LIMIT_GLOBAL,
+            .type = INTEGER,
+            .int_value = limit
+        };
 
-        Handle client_handle;
-        //Handle reply_handle;
-        //s32 rIndex = 0;
-        void* tls = armGetTls();
-        
-        while(true) {
-            logToFile("[Service] Wait for next request...\n");
+        saveSetting(settings, setting);
+        logToFile("[Service] Daily limit is set to %i minutes\n", limit);
 
-            res = svcWaitSynchronizationSingle(s_service_handle, UINT64_MAX);
-            if(R_FAILED(res)) {
-                logToFile("[Service] An error occured: %i", res);
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::getCurrentVersion(Ipc::Request* request) {
+        logToFile("[Service] Getting current version: %s\n", VERSION);
+
+        std::string _ver = VERSION;
+        request->appendReplyValue(_ver);
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result PctrlService::commandThread(Ipc::Request* request) {
+        const auto cmd = static_cast<Ipc::Command>(request->cmd());
+        logToFile("[Service] request received: %s\n", Ipc::commandToString(cmd).c_str());
+
+        switch (cmd) {   
+            case Ipc::Command::Version: {
+                return getCurrentVersion(request);
+            }
+            case Ipc::Command::Test: {
+                showScreenTimeout();
+                break;
+            }
+            case Ipc::Command::GetCurrentUserUid: {
+                return getCurrentUserUid(request);
+            }
+            case Ipc::Command::GetCurrentUserNickname: {
+                return getCurrentUserNickname(request);
+            }
+            case Ipc::Command::GetUsersList: {
+                return getUsersList(request);
+            }        
+            case Ipc::Command::GetUserUsageTime: {                                
+                return getUserUsageTime(request);                
+            }
+            case Ipc::Command::GetUserRemainingTime: {                
+                return getUserRemainingTime(request);   
+            }
+            case Ipc::Command::GetRunningApplication: {
+                return getRunningApplication(request);
+            }
+            case Ipc::Command::SetUserLimits: {                           
+                return setUserLimits(request);
+            }
+            case Ipc::Command::SetAdminPin: {                
+                return setAdminPin(request);
+            }
+            case Ipc::Command::VerifyAdminPin: {                
+                return verifyAdminPin(request);
+            }
+            case Ipc::Command::SetWorkingMode: {
+                return setWorkingMode(request);
+            }
+            case Ipc::Command::GetWorkingMode: {
+                return getWorkingMode(request);
+            }
+            case Ipc::Command::SetShowRemainingTime: {
+                return setShowRemainingTime(request);
+            }
+            case Ipc::Command::IsEnabled: {
+                return isEnabled(request);
+            }
+            case Ipc::Command::SetEnabled: {
+                return setEnabled(request);
+            }
+            case Ipc::Command::GetDailyLimit: {
+                return getDailyLimit(request);
+            }
+            case Ipc::Command::SetDailyLimit: {
+                return setDailyLimit(request);
+            }
+            default: {
+                logToFile("[Service] command %i not handled.\n", request->cmd());                
+                return Ipc::Result::UnknownCommand;
+            }
+        }        
+
+        return Ipc::Result::Ok;
+    }
+    
+    void PctrlService::listen() {                
+        logToFile("[Service] Starting listening\n");
+
+        while(true) {            
+            if (!ipcServer_->process()) {
+                // When an error occurs we exit
                 return;
             }
 
-            res = svcAcceptSession(&client_handle, s_service_handle);
-            if(R_FAILED(res)) {
-                logToFile("[Service] Accept session failed\n");
-                return;
-            }
-
-            res = svcReplyAndReceiveLight(client_handle);
-            if(R_FAILED(res)) {
-                logToFile("[Service] replyAndReceive failed, client disconnected?\n");
-                continue;
-            }
-
-            HipcParsedRequest r = hipcParseRequest(tls);
-            if(r.meta.type != CmifCommandType_Request) {
-                logToFile("[Service] this is not a request. Aborting\n");
-                continue;
-            }
-
-            // Verify header
-            Header* header = static_cast<Header*>(cmifGetAlignedDataStart(r.data.data_words, tls));
-            size_t headerSize = r.meta.num_data_words * 4;
-            if(!header || headerSize < sizeof(Header) || header->magic != CMIF_IN_HEADER_MAGIC) {
-                logToFile("[Service] malformed header\n");
-                continue;
-            }
-
-            // Read data
-            logToFile("[Service] CmdId = %i\n", header->cmdId);
-            logToFile("[Service] result = %i\n", header->result);
-
-            u8* ptrData = reinterpret_cast<u8*>(header) + sizeof(Header);
-            size_t dataSize = headerSize - sizeof(Header);
-            void* data = malloc(dataSize+1);
-            memset(data, 0, dataSize+1);
-            memcpy(data, ptrData, dataSize);
-
-            logToFile("[Service] Recv = %s\n", data);
+            svcSleepThread(5'000);
         }
-        
 
-        logToFile("[Service] Listen() will exit\n");
+        logToFile("[Service] Stopped listening\n");
     }
 
-    void PctrlService::CloseAndClean() {
-        canRun = false;
-        os::WaitThread(std::addressof(s_thread));
-        os::DestroyThread(std::addressof(s_thread));     
-        //threadWaitForExit(&s_thread);
-        //threadClose(&s_thread);
-        
-        svcCloseHandle(s_service_handle);
-
-        Result rc = smUnregisterService(service_name_);
-        if (R_FAILED(rc)) {
-            logToFile("[Service] Could not unregister the service\n");
-        }
-    }
-
-    /** Class Service */
-    void Service::Ping() {
-        logToFile("[Service] Ping received\n");
-        handlers::AnswerToPing();
-    }
 }

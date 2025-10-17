@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 namespace Ipc {
     enum class Command {
         Version,            /*! Queries the server version. Result: the version as a string. */
@@ -19,6 +21,9 @@ namespace Ipc {
         SetShowRemainingTime,  /*! Activate the remaining time badge in the upper right corner*/
         GetShowRemainingTime,
         IsEnabled,
-        SetEnabled
+        SetEnabled,
+        GetDailyLimit,
+        SetDailyLimit
     };
+
 };

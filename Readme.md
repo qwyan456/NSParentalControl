@@ -31,7 +31,7 @@ Parental control has the following features:
 
 ## Coming features
 
-Coming features are in the project page.
+Coming features are in the [GitHub project](https://github.com/users/TristanIsrael/projects/6/views/1) page.
 
 ## Licence
 

@@ -35,7 +35,7 @@ bool connectToService() {
         return false;
     }
 
-    logToFile("[Overlay] Connexion au service effectuée");
+    logToFile("[Overlay] Connected to pctrl service");
     logIntToFile(getAppContext().pctrl_service.session);
     getAppContext().is_enabled = true;
 
@@ -43,11 +43,9 @@ bool connectToService() {
 }
 
 int main(int argc, char** argv) {
-    Result rc = smInitialize();
-    rc = fsInitialize();
-    
-    // Disable this if you don't want to use the SD card filesystem.
-    rc = fsdevMountSdmc();
+    smInitialize();
+    fsInitialize();
+    fsdevMountSdmc();
 
     setLogFilename("sdmc:/switch/pctrl_ovl.log");
     clearLog();
@@ -63,6 +61,10 @@ int main(int argc, char** argv) {
 
     logToFile("[Overlay] Exiting overlay");
 
+    // Clean all
+    if(getAppContext().pctrl_service.session > 0) {
+        serviceClose(&getAppContext().pctrl_service);
+    }
     fsdevUnmountAll(); 
     fsExit(); 
     smExit();    
