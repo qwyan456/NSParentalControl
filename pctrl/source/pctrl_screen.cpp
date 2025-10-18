@@ -404,12 +404,12 @@ namespace alefbet::pctrl::srv {
         logToFile("[Screen] Show timeout screen\n");
         auto settings = loadSettings();
 
-        if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
-            if(settings[SETTING_SHOW_REMAINING_TIME].int_value > 0) {
-                logToFile("[Screen] display mode is remaining time.\n");
+        /*if(settings.contains(SETTING_WORKING_MODE)) {
+            if(settings[SETTING_WORKING_MODE].int_value == WorkingModeInfo) {
+                logToFile("[Screen] display mode is information.\n");
                 return 0;
             }
-        }
+        }*/
 
         /* Pre-render the framebuffer. */
         this->PreRenderFrameBuffer();

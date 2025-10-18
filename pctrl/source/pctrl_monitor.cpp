@@ -103,7 +103,7 @@ namespace alefbet::pctrl::srv {
 
                     if(remaining_time <= 0) {
                         logToFile("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
-                        //service_->gui().ShowScreenTimeout();
+                        service_->gui().ShowScreenTimeout();
                     } else if(remaining_time <= 5) {
                         logToFile("[Monitor] Remaining time for user %i is exactly 5 minutes. Warn the user.\n", uid_str);
                         //service_->gui().ShowScreenWarning();
