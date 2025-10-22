@@ -7,13 +7,11 @@
 #include <string_view>
 #include <ranges>
 #include <codecvt>
-#include <stratosphere.hpp>
 #include "logger.h"
 #include "ams_bpc.h"
 
 using namespace alefbet::pctrl::logger;
 using namespace alefbet::pctrl::structs;
-using namespace ams::fs;
 using std::operator""sv;
 
 namespace alefbet::pctrl::helpers {
@@ -171,7 +169,7 @@ namespace alefbet::pctrl::helpers {
             return "";
         }
         
-        char buffer[9];
+        char buffer[13] = {0};
         std::snprintf(buffer, sizeof(buffer), "%04d%02d%02d",
             time.year,
             time.month,

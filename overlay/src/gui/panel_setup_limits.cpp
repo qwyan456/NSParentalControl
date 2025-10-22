@@ -7,7 +7,7 @@
 #include "Command.hpp"
 #include "AppContext.h"
 #include "helpers/ipc_helpers.h"
-#include "panel_setup_menu.h"
+#include "panel_admin_menu.h"
 
 using namespace alefbet::pctrl;
 using namespace std::chrono;

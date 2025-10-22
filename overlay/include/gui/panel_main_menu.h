@@ -19,7 +19,7 @@ public:
     virtual bool handleInput(u64 keysDown, u64 keysHeld, const HidTouchState &touchPos, HidAnalogStickState joyStickPosLeft, HidAnalogStickState joyStickPosRight) override;
 
 private:
-    
+    bool dirty_ = false;
 
 private:    
     tsl::elm::OverlayFrame* rootFrame_ = nullptr;

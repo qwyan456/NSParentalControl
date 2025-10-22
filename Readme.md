@@ -140,3 +140,7 @@ In this folder create an empty file named `boot2.flag`
 
 https://github.com/switchbrew/switch-examples/tree/master
 
+## Credits
+
+Images from:
+- Hannazasimova (@Freepik.com)

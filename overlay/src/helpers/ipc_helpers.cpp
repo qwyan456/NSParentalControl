@@ -226,7 +226,8 @@ namespace alefbet::pctrl::ipc {
     }
     
     bool setShowRemainingTime(const bool& active) {
-        logToFile("[IPC] Setting remaining time visibility");
+        logToFile("[IPC] Setting remaining time visibility:");
+        logToFile(active ? "true" : "false");
 
         auto& service = getAppContext().pctrl_service;
         Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetShowRemainingTime, active);

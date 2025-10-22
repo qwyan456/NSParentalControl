@@ -32,9 +32,10 @@ namespace Ipc {
         // Create server
         Handle serverHandle;
         this->serverName = smEncodeName(name.c_str());
+        smInitialize();
         ::Result rc = smRegisterService(&serverHandle, this->serverName, false, maxClients);
         if (R_FAILED(rc)) {
-            logToFile("[IPC] Couldn't create server: %i\n", rc);
+            logToFile("[IPC] Couldn't create server: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return;
         }
 
@@ -182,5 +183,7 @@ namespace Ipc {
                 logToFile("[IPC] Couldn't unregister server: %i\n", rc);
             }
         }
+
+        smExit();
     }
 }

@@ -7,7 +7,7 @@
 #include "AppContext.h"
 #include "helpers/ipc_helpers.h"
 #include "panel_setuppin.h"
-#include "panel_setup_menu.h"
+#include "panel_admin_menu.h"
 #include "panel_main_menu.h"
 
 using namespace alefbet::pctrl;
@@ -105,6 +105,6 @@ bool VerifyPinPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouchState
 void VerifyPinPanel::goToNextPanel() const {
     switch(nextPanel_) {
         case PanelSetPin: tsl::changeTo<SetupPinPanel>(); break;
-        case PanelSetupMenu: tsl::changeTo<SetupMenuPanel>(); break;
+        case PanelSetupMenu: tsl::changeTo<AdminMenuPanel>(); break;
     }
 }

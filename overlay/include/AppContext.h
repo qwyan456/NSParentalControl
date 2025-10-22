@@ -4,7 +4,7 @@
 struct AppContext {
     bool is_enabled = false;    
     Service pctrl_service;
-    bool is_debug = false;
+    bool is_debug = true;
 };
 
 AppContext& getAppContext();
