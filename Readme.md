@@ -33,6 +33,10 @@ Parental control has the following features:
 
 Coming features are in the [GitHub project](https://github.com/users/TristanIsrael/projects/6/views/1) page.
 
+## Screenshots
+
+![Time out](pctrl/misc/timeout.png)
+
 ## Licence
 
 The source code and the binaries are under [GPL v3 licence](LICENSE). 
