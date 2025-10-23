@@ -35,7 +35,23 @@ Coming features are in the [GitHub project](https://github.com/users/TristanIsra
 
 ## Screenshots
 
+![Tesla Main menu](docs/2025102321560900.jpg)
+**Tesla Main Menu**
+
+![Parental control main menu](docs/2025102321561600.jpg)
+**Parental control main menu**
+
+![Parental control admin PIN](docs/2025102321562400.jpg)
+**Parental control admin PIN**
+
+![Parental control admin menu](docs/2025102321564400.jpg)
+**Parental control admin menu**
+
+![Parental control limits setting](docs/2025102321565700.jpg)
+**Parental control limits settings**
+
 ![Time out](pctrl/misc/timeout.png)
+**Timeout screen**
 
 ## Licence
 
