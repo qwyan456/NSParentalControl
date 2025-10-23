@@ -42,7 +42,7 @@ namespace alefbet {
                 constexpr inline Color(u8 r, u8 g, u8 b, u8 a): r(r), g(g), b(b), a(a) {}
             };
 
-            static const NvColorFormat g_nvColorFmtTable[] = {
+            /*static const NvColorFormat g_nvColorFmtTable[] = {
                 NvColorFormat_A8B8G8R8, // PIXEL_FORMAT_RGBA_8888
                 NvColorFormat_X8B8G8R8, // PIXEL_FORMAT_RGBX_8888
                 NvColorFormat_R8_G8_B8, // PIXEL_FORMAT_RGB_888   <-- doesn't work
@@ -55,7 +55,7 @@ namespace alefbet {
             void* __attribute__((weak)) __libnx_aligned_alloc(size_t alignment, size_t size) {
                 size = (size + alignment - 1) &~ (alignment - 1);
                 return aligned_alloc(alignment, size);
-            }
+            }*/
 
             class Renderer {
                 public:
@@ -65,8 +65,12 @@ namespace alefbet {
                         return renderer;
                     }                               
                     
-                    void generateAruid() {
+                    /*void generateAruid() {
                         aruid_ = 0x1000 + (rand() & 0xFFFFF);
+                    }*/
+
+                    bool isInitialized() {
+                        return m_initialized;
                     }
 
                     void init(u16 width, u16 height, u16 posX, u16 posY) {
@@ -82,16 +86,20 @@ namespace alefbet {
                         if (this->m_initialized)
                             return;
 
-                        generateAruid();
+                        //generateAruid();
 
                         Result rc = smInitialize();
                         rc = viInitialize(ViServiceType_Manager);
+                        logToFile("viInitialize %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = viOpenDefaultDisplay(&this->m_display);
+                        logToFile("viOpenDefaultDisplay %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = viGetDisplayVsyncEvent(&this->m_display, &this->m_vsyncEvent);
+                        logToFile("viGetDisplayVsyncEvent %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         //u64 aruid = appletGetAppletResourceUserId();
                         //logToFile("[Renderer] aruid=%i\n", aruid);
-                        rc = viCreateManagedLayer(&this->m_display, static_cast<ViLayerFlags>(0), 0, &__nx_vi_layer_id);
+                        //rc = viCreateManagedLayer(&this->m_display, static_cast<ViLayerFlags>(0), 0, &__nx_vi_layer_id);
                         rc = viCreateLayer(&this->m_display, &this->m_layer);
+                        logToFile("__nx_vi_layer_id=%i\n", __nx_vi_layer_id);
                         logToFile("viCreateLayer %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = viSetLayerScalingMode(&this->m_layer, ViScalingMode_FitToLayer);
                         //rc = viSetLayerScalingMode(&this->m_layer, ViScalingMode_PreserveAspectRatio);
@@ -103,7 +111,8 @@ namespace alefbet {
                         
                         rc = viSetLayerZ(&this->m_layer, 99);
                         logToFile("viSetLayerZ %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
-                        rc = viAddToLayerStack(&this->m_layer, ViLayerStack_Default);
+                        //rc = viAddToLayerStack(&this->m_layer, ViLayerStack_Default);
+                        
 
                         /*rc = viAddToLayerStack(&this->m_layer, ViLayerStack_Default);
                         rc = viAddToLayerStack(&this->m_layer, ViLayerStack_Screenshot);
@@ -120,8 +129,8 @@ namespace alefbet {
                         logToFile("viSetLayerPosition %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = nwindowCreateFromLayer(&this->m_window, &this->m_layer);
                         logToFile("nwindowCreateFromLayer %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
-                        rc = _framebufferCreate(&this->m_framebuffer, &this->m_window, FramebufferWidth, FramebufferHeight, PIXEL_FORMAT_RGBA_4444, 2);
-                        logToFile("_framebufferCreate %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        rc = framebufferCreate(&this->m_framebuffer, &this->m_window, FramebufferWidth, FramebufferHeight, PIXEL_FORMAT_RGBA_4444, 2);
+                        logToFile("framebufferCreate %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = setInitialize();
                         rc = initFonts();
                         setExit();
@@ -311,8 +320,8 @@ namespace alefbet {
                         for (s32 y1 = 0; y1 < h; y1++) {
                             for (s32 x1 = 0; x1 < w; x1++) {
                                 const Color color = { static_cast<u8>(bmp[0] >> 4), static_cast<u8>(bmp[1] >> 4), static_cast<u8>(bmp[2] >> 4), static_cast<u8>(bmp[3] >> 4) };
-                                setPixelBlendSrc(x + x1, y + y1, a(color));
-                                //setPixel(x + x1, y + y1, a(color));
+                                //setPixelBlendSrc(x + x1, y + y1, a(color));
+                                setPixel(x + x1, y + y1, a(color));
                                 bmp += 4;
                             }
                         }
@@ -476,19 +485,24 @@ namespace alefbet {
                     }
 
                     inline void startFrame() {
+                        if(!m_initialized) return;
                         this->m_currentFramebuffer = framebufferBegin(&this->m_framebuffer, nullptr);
-                        fillScreen(Color({0, 0, 0, 0}));
+                        //this->fillScreen({ 0x00, 0x00, 0x00, 0x00 });
                     }
 
                     inline void fillScreen(Color color) {
+                        if(!m_initialized) return;
                         std::fill_n(static_cast<Color*>(this->getCurrentFramebuffer()), this->getFramebufferSize() / sizeof(Color), color);
                     }
 
                     inline void clearScreen() {
+                        if(!m_initialized) return;
                         this->fillScreen({ 0x00, 0x00, 0x00, 0x00 });
                     }
 
                     inline void endFrame() {
+                        if(!m_initialized) return;
+                        
                         this->waitForVSync();
                         framebufferEnd(&this->m_framebuffer);
 
@@ -530,13 +544,21 @@ namespace alefbet {
                         if (!this->m_initialized)
                             return;
 
+                        logToFile("[Renderer] exit\n");
                         framebufferClose(&this->m_framebuffer);
+                        logToFile("[Renderer] fb closed\n");
                         nwindowClose(&this->m_window);
-                        viDestroyManagedLayer(&this->m_layer);
-                        viCloseLayer(&this->m_layer);
-                        viCloseDisplay(&this->m_display);
+                        logToFile("[Renderer] window closed\n");
+                        //viDestroyManagedLayer(&this->m_layer);
+                        Result rc = viCloseLayer(&this->m_layer);
+                        logToFile("[Renderer] layer closed %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        rc = viCloseDisplay(&this->m_display);
+                        logToFile("[Renderer] display closed %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         eventClose(&this->m_vsyncEvent);
+                        logToFile("[Renderer] event closed\n");
                         viExit();
+                        logToFile("[Renderer] vi closed\n");
+                        this->m_initialized = false;
                     }
 
                 private:
@@ -553,9 +575,9 @@ namespace alefbet {
                         return this->m_currentFramebuffer;
                     }
 
-                    inline void* getNextFramebuffer() {
+                    /*inline void* getNextFramebuffer() {
                         return static_cast<u8*>(this->m_framebuffer.buf) + this->getNextFramebufferSlot() * this->getFramebufferSize();
-                    }
+                    }*/
 
                     inline size_t getFramebufferSize() {
                         return this->m_framebuffer.fb_size;
@@ -573,7 +595,7 @@ namespace alefbet {
                         return (this->getCurrentFramebufferSlot() + 1) % this->getFramebufferCount();
                     }
 
-                    Result _framebufferCreate(Framebuffer* fb, NWindow *win, u32 width, u32 height, u32 format, u32 num_fbs)
+                    /*Result _framebufferCreate(Framebuffer* fb, NWindow *win, u32 width, u32 height, u32 format, u32 num_fbs)
                     {
                         Result rc = 0;
                         if (!fb || !nwindowIsValid(win) || !width || !height || format < PIXEL_FORMAT_RGBA_8888 || format > PIXEL_FORMAT_RGBA_4444 || num_fbs < 1 || num_fbs > 3)
@@ -667,7 +689,35 @@ namespace alefbet {
                         }
 
                         return rc;
-                    }
+                    }*/
+
+                    /*void framebufferClose(Framebuffer* fb)
+                    {
+                        if (!fb || !fb->has_init)
+                            return;
+
+                        logToFile("1\n");
+                        if (fb->buf_linear)
+                            free(fb->buf_linear);
+
+                        if (fb->buf) {                            
+                            nwindowReleaseBuffers(fb->win);
+                            logToFile("2\n");
+                            nvMapClose(&fb->map);
+                            logToFile("3\n");
+                            free(fb->buf);
+                            logToFile("4\n");
+                        }
+
+                        memset(fb, 0, sizeof(*fb));
+                        logToFile("5\n");
+                        nvFenceExit();
+                        logToFile("6\n");
+                        nvMapExit();
+                        logToFile("7\n");
+                        nvExit();
+                        logToFile("8\n");
+                    }*/
 
                 private:
                     u16 LayerWidth  = 0;
@@ -676,7 +726,7 @@ namespace alefbet {
                     u16 LayerPosY   = 0;
                     u16 FramebufferWidth  = 0;
                     u16 FramebufferHeight = 0;
-                    u64 aruid_ = 0;
+                    //u64 aruid_ = 0;
                     bool m_initialized = false;
                     ViDisplay m_display;
                     ViLayer m_layer;

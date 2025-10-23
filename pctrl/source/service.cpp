@@ -25,7 +25,7 @@
 #include "database/settings.h"
 #include "database/database.h"
 #include "monitor.h"
-#include "gui_controller.h"
+#include "gui/gui_controller.h"
 
 //#define PSEC_DEBUG 1
 
@@ -365,11 +365,11 @@ namespace alefbet::pctrl::srv {
 
         saveSetting(settings, setting);
 
-        if(showRemainingTime) {
+        /*if(showRemainingTime) {
             gui_.showRemainingTimePanel();
         } else {
             gui_.hideRemainingTimePanel();
-        }
+        }*/
 
         logToFile("[Service] Ok\n");
         return Ipc::Result::Ok;

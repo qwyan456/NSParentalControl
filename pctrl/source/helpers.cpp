@@ -110,11 +110,11 @@ namespace alefbet::pctrl::helpers {
 
         ::Result rc = pmdmntGetApplicationProcessId(&process_id);
         if(rc != 0) {
-            logToFile("[Helpers] Could not get application process ID: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+            //logToFile("[Helpers] Could not get application process ID: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return 0;
         }
 
-        logToFile("[Helpers] process ID=%i\n", process_id);
+        //logToFile("[Helpers] process ID=%i\n", process_id);
 
         return process_id;
     }
@@ -124,12 +124,12 @@ namespace alefbet::pctrl::helpers {
 
         ::Result rc = pmdmntGetProgramId(&title_id, process_id);
         if(rc != 0) {
-            logToFile("[Helpers] Could not get the title ID for the process %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+            //logToFile("[Helpers] Could not get the title ID for the process %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return 0;
         }
         
         auto formatted_title_id = titleIdToString(title_id);
-        logToFile("[Helpers] title formatted ID=%s, ID=%i, pid=%i\n", formatted_title_id.c_str(), title_id, process_id);
+        //logToFile("[Helpers] title formatted ID=%s, ID=%i, pid=%i\n", formatted_title_id.c_str(), title_id, process_id);
 
         return title_id;
     }

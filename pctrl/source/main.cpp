@@ -16,16 +16,6 @@ using namespace alefbet::pctrl::logger;
 extern "C" {
 #endif
 
-    //static char g_argv[2048];
-    //static char g_nextArgv[2048];
-    //static char g_nextNroPath[512];
-    //u64  g_nroAddr = 0;
-    //static u64  g_nroSize = 0;
-    //static NroHeader g_nroHeader;
-
-    /*static u64 g_appletHeapSize = 0;
-    static u64 g_appletHeapReservationSize = 0;*/
-
     constexpr size_t TotalHeapSize = ams::util::AlignUp(6_MB, ams::os::MemoryHeapUnitSize);
 
     constexpr size_t ThreadServiceStackRequiredSizeBytes = ams::util::AlignUp(512_KB, 128);
@@ -34,36 +24,18 @@ extern "C" {
     constexpr size_t ThreadMonitorStackRequiredSizeBytes = ams::util::AlignUp(256_KB, 128);
     constexpr size_t ThreadMonitorStackRequiredSizeAligned = ams::util::AlignUp(ThreadMonitorStackRequiredSizeBytes, ams::os::MemoryPageSize);
     
-    constinit u8 *g_heap_pointer = nullptr;
-
     alignas(ams::os::MemoryPageSize) constinit u8 g_thread_service_memory[ThreadServiceStackRequiredSizeAligned];
     alignas(ams::os::MemoryPageSize) constinit u8 g_thread_monitor_memory[ThreadMonitorStackRequiredSizeAligned];
-
-    //static u128 g_userIdStorage;
-
-    //static u8 g_savedTls[0x100];
 
     // Minimize fs resource usage
     u32 __nx_fsdev_direntry_cache_size = 1;
     bool __nx_fsdev_support_cwd = false;
 
-    // Used by trampoline.s
-    Result g_lastRet = 0;
-
-    extern void* __stack_top; // Defined in libnx.
-    #define STACK_SIZE 0x10000 // Change this if main-thread stack size ever changes.    
-
     u32 __nx_applet_type = AppletType_None;
-    //u32 __nx_fs_num_sessions = 1;
-    //u32  __nx_nv_transfermem_size = 0x40000;
     ViLayerFlags __nx_vi_stray_layer_flags = (ViLayerFlags)0;
-
-    /** End of Tesla global variables */
 
     void __libnx_initheap(void)
     {
-        //static char g_innerheap[0x4000];
-
         extern char* fake_heap_start;
         extern char* fake_heap_end;        
         void* addr = nullptr;
@@ -88,8 +60,6 @@ extern "C" {
             rc = setsysGetFirmwareVersion(&fw);
             if (R_SUCCEEDED(rc))
                 hosversionSet(MAKEHOSVERSION(fw.major, fw.minor, fw.micro));
-            //g_appletHeapSize = TotalHeapSize; //0x600000;
-            //g_appletHeapReservationSize = 0x00;
             setsysExit();
         }
 
@@ -120,30 +90,7 @@ extern "C" {
         __builtin_unreachable();
     }
 
-    /*static void*  g_heapAddr;
-    static size_t g_heapSize;
-
-    static bool setupHbHeap(void)
-    {
-        void* addr = NULL;
-        u64 size = g_appletHeapSize;
-
-        Result rc = svcSetHeapSize(&addr, size);
-
-        if (R_FAILED(rc) || addr==NULL)
-            fatalThrow(MAKERESULT(Module_HomebrewLoader, 9));
-
-        g_heapAddr = addr;
-        g_heapSize = size;        
-
-        return g_heapSize > 0;
-
-    }*/
-
     void testMemory() {
-        //logToFile("[Main] g_heapAddr=%p\n", g_heapAddr);
-        //logToFile("[Main] g_heapSize=%p\n", g_heapSize);
-
         int on_stack = 0;
         int* on_heap = new int(0);
         logToFile("@on_stack=%p\n", &on_stack);
@@ -163,7 +110,7 @@ extern "C" {
                 logToFile("Allocation of %i bytes failed\n", s);    
                 break;                                            
             }            
-        } */       
+        } */
     }
 
 
@@ -199,23 +146,15 @@ int main(int argc, char **argv)
     clearLog();
     logToFile("[Main] Parental control starting\n");
 
-    /*if(!setupHbHeap()) {
-        logToFile("[Main] Could not continue without a valid heap.\n");
-        return 1;
-    }*/
-
-    testMemory();
+    //testMemory();
 
     ::Result rc = 0;
 
     // Loop processing the IPC server.        
     Ipc::Server* ipcServer = new Ipc::Server("pctrl");
-    logToFile("@ipcServer=%p\n", (void*)ipcServer);
-    alefbet::pctrl::srv::Service* service = new alefbet::pctrl::srv::Service(ipcServer);
-    logToFile("@service=%p\n", (void*)service);
+    alefbet::pctrl::srv::Service* service = new alefbet::pctrl::srv::Service(ipcServer);    
 
     Thread threadIpc;
-    //TODO: replace heap with malloc buffer?
     rc = threadCreate(&threadIpc, alefbet::pctrl::startIpc, service, g_thread_service_memory, ThreadServiceStackRequiredSizeAligned, 0x2c, -2);               
     if(R_FAILED(rc)) {
         logToFile("Could not create the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
@@ -241,7 +180,8 @@ int main(int argc, char **argv)
         return 5;
     }
 
-    monitor->start(); // Start monitoring
+    // Start monitoring
+    monitor->start(); 
 
     rc = threadWaitForExit(&threadIpc);
     if(R_FAILED(rc)) {

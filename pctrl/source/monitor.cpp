@@ -9,9 +9,12 @@
 using namespace alefbet::pctrl::logger;
 using namespace alefbet::pctrl::helpers;
 using namespace alefbet::pctrl::database;
+using namespace std::chrono_literals;
 
-constexpr std::chrono::minutes DelayInMinutes(1);
-constexpr std::chrono::nanoseconds DelayInNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(DelayInMinutes); 
+constexpr std::chrono::minutes MainLoopDelayInMinutes = 1min;
+constexpr std::chrono::nanoseconds MainLoopDelayInNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(MainLoopDelayInMinutes); 
+constexpr std::chrono::duration SubLoopDelayInMillis = 1000ms;
+constexpr std::chrono::nanoseconds SubLoopDelayInNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(SubLoopDelayInMillis); 
 
 namespace alefbet::pctrl::srv {
 
@@ -33,6 +36,7 @@ namespace alefbet::pctrl::srv {
     void Monitor::loop() {        
         logToFile("[Monitor] Starting monitoring loop\n");        
         //WorkingMode workingMode = WorkingModeInfo;        
+        u64 pid = 0;
 
         while(true) {
             if(!running_) {
@@ -56,12 +60,12 @@ namespace alefbet::pctrl::srv {
             logToFile("[Monitor] Update usages\n");
             // Query the active application and user
             // and update the database
-            const auto pid = getRunningApplicationPid();
-            const auto title_id = getRunningApplicationTitleId(pid);            
+            pid = getRunningApplicationPid();            
             
             const auto daily_limit = settings[SETTING_DAILY_LIMIT_GLOBAL].int_value;
 
-            if(title_id != 0) { 
+            if(pid != 0) { 
+                const auto title_id = getRunningApplicationTitleId(pid);
                 const auto user = getCurrentUser();
 
                 if(user.isValid()) {
@@ -89,7 +93,7 @@ namespace alefbet::pctrl::srv {
                         service_->gui().ShowRemainingTime();
                     }*/
 
-                    const auto entry = addToHistory(user.uid, title_id, DelayInMinutes.count());                    
+                    const auto entry = addToHistory(user.uid, title_id, MainLoopDelayInMinutes.count());                    
 
                     if(!entry.isValid()) {
                         continue;
@@ -102,6 +106,12 @@ namespace alefbet::pctrl::srv {
                     if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
                         const auto& showRemainingTime = settings[SETTING_SHOW_REMAINING_TIME].int_value > 0;                                                
                         if(showRemainingTime) {
+                            if(!service_->gui().isRemainingTimePanelVisible()) {
+                                logToFile("[Monitor] Show the remaining time panel\n");
+                                service_->gui().showRemainingTimePanel();
+                            }
+
+                            logToFile("[Monitor] Update the remaining time panel\n");
                             service_->gui().updateRemainingTimePanel(remainingTimeInMinutes, daily_limit); 
                         }
                     }
@@ -121,9 +131,21 @@ namespace alefbet::pctrl::srv {
                 }
             } else {
                 logToFile("[Monitor] No title running\n");
+                service_->gui().hideRemainingTimePanel();
             }
 
-            svcSleepThread(DelayInNanos.count()); //Wait for a minute
+            // Sub-loop to monitor games usage and show/hide the remaining time panel
+            for(int i = 0 ; i < MainLoopDelayInNanos.count() / SubLoopDelayInNanos.count() ; ++i) {
+                pid = getRunningApplicationPid();   
+                if(pid == 0 && service_->gui().isRemainingTimePanelVisible()) {
+                    // If no app is running we hide the remaining time panel
+                    service_->gui().hideRemainingTimePanel();
+                }
+
+                svcSleepThread(SubLoopDelayInNanos.count()); // Wait a little
+            }
+
+            //svcSleepThread(MainLoopDelayInNanos.count()); //Wait 1 minute
         }
 
         logToFile("[Monitor] Stopped monitoring.\n");

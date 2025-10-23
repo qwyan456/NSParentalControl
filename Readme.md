@@ -33,6 +33,26 @@ Parental control has the following features:
 
 Coming features are in the [GitHub project](https://github.com/users/TristanIsrael/projects/6/views/1) page.
 
+## Screenshots
+
+![Tesla Main menu](docs/2025102321560900.jpg)
+**Tesla Main Menu**
+
+![Parental control main menu](docs/2025102321561600.jpg)
+**Parental control main menu**
+
+![Parental control admin PIN](docs/2025102321562400.jpg)
+**Parental control admin PIN**
+
+![Parental control admin menu](docs/2025102321564400.jpg)
+**Parental control admin menu**
+
+![Parental control limits setting](docs/2025102321565700.jpg)
+**Parental control limits settings**
+
+![Time out](pctrl/misc/timeout.png)
+**Timeout screen**
+
 ## Licence
 
 The source code and the binaries are under [GPL v3 licence](LICENSE). 
@@ -140,7 +160,3 @@ In this folder create an empty file named `boot2.flag`
 
 https://github.com/switchbrew/switch-examples/tree/master
 
-## Credits
-
-Images from:
-- Hannazasimova (@Freepik.com)

@@ -41,7 +41,7 @@ tsl::elm::Element* MainMenuPanel::createUI() {
     rootFrame_ = new tsl::elm::OverlayFrame("Parental Control", subTitle);
     rootList_ = new tsl::elm::List();
     
-    rebuildUI();
+    rebuildUI();        
 
     return rootFrame_;
 }
