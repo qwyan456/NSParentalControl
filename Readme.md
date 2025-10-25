@@ -6,7 +6,7 @@ It can be used freely.
 
 ## Current version
 
-[1.0.1](https://github.com/users/TristanIsrael/NSParentalControl/releases/tag/1.0.1)
+[1.0.1](https://github.com/TristanIsrael/NSParentalControl/releases/tag/1.0.1)
 
 ## Users categories
 
