@@ -6,7 +6,7 @@ It can be used freely.
 
 ## Current version
 
-1.0.0 (MVP)
+[1.0.1](releases/tag/1.0.1)
 
 ## Users categories
 
