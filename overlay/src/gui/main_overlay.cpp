@@ -1,6 +1,5 @@
 #include "main_overlay.h"
 #include <switch.h>
-#include <tesla.hpp>
 #include "panel_main_menu.h"
 #include "logger.h"
 

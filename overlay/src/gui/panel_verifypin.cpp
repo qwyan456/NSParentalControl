@@ -1,6 +1,5 @@
 #include "panel_verifypin.h"
 #include "logger.h"
-#include <tesla.hpp>
 #include <switch.h>
 #include <mutex>
 #include "Command.hpp"

@@ -1,6 +1,5 @@
 #include "panel_setuppin.h"
 #include "logger.h"
-#include <tesla.hpp>
 #include <switch.h>
 #include <mutex>
 #include "Command.hpp"

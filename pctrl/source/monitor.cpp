@@ -13,7 +13,7 @@ using namespace std::chrono_literals;
 
 constexpr std::chrono::minutes MainLoopDelayInMinutes = 1min;
 constexpr std::chrono::nanoseconds MainLoopDelayInNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(MainLoopDelayInMinutes); 
-constexpr std::chrono::duration SubLoopDelayInMillis = 1000ms;
+constexpr std::chrono::milliseconds SubLoopDelayInMillis = 1000ms;
 constexpr std::chrono::nanoseconds SubLoopDelayInNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(SubLoopDelayInMillis); 
 
 namespace alefbet::pctrl::srv {
@@ -45,6 +45,7 @@ namespace alefbet::pctrl::srv {
                 continue;
             }
             
+            logToFile("[Monitor] Monitoring loop has started\n");
             auto settings = loadSettings();
 
             // Verify whether the service is enabled
@@ -131,7 +132,10 @@ namespace alefbet::pctrl::srv {
                 }
             } else {
                 logToFile("[Monitor] No title running\n");
-                service_->gui().hideRemainingTimePanel();
+                if(service_->gui().isRemainingTimePanelVisible()) {
+                    service_->gui().hideRemainingTimePanel();
+                }
+                logToFile("[Monitor] ok\n");
             }
 
             // Sub-loop to monitor games usage and show/hide the remaining time panel
@@ -145,6 +149,7 @@ namespace alefbet::pctrl::srv {
                 svcSleepThread(SubLoopDelayInNanos.count()); // Wait a little
             }
 
+            logToFile("[Monitoring] loop\n");
             //svcSleepThread(MainLoopDelayInNanos.count()); //Wait 1 minute
         }
 

@@ -1,5 +1,5 @@
 #include "panel_main_menu.h"
-#include <tesla.hpp>
+//#include <tesla.hpp>
 #include <switch.h>
 #include <chrono>
 #include "version.h"

@@ -7,7 +7,7 @@
 #include <switch.h>
 
 #define TESLA_INIT_IMPL
-#include "tesla.hpp"
+#include <tesla.hpp>
 #include "gui/main_overlay.h"
 #include "logger.h"
 #include "AppContext.h"

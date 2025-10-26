@@ -1,7 +1,7 @@
 #pragma once
 
 #include "switch.h"
-#include "tesla.hpp"
+#include <tesla.hpp>
 
 class AdminMenuPanel : public tsl::Gui {
 public:

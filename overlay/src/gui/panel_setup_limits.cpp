@@ -1,5 +1,4 @@
 #include "panel_setup_limits.h"
-#include <tesla.hpp>
 #include <switch.h>
 #include <mutex>
 #include <chrono>

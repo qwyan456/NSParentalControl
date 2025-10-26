@@ -1,6 +1,5 @@
 #include "panel_admin_menu.h"
 #include "logger.h"
-#include <tesla.hpp>
 #include <switch.h>
 #include "Command.hpp"
 #include "AppContext.h"

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "switch.h"
-#include "tesla.hpp"
+#include <tesla.hpp>
 
 typedef enum {
     NO_ERROR = 0,

@@ -22,7 +22,7 @@ namespace alefbet::pctrl::srv {
             }
 
         private:            
-            s16 remainingTimeInMinutes(const HistoryEntry& entry);
+            //s16 remainingTimeInMinutes(const HistoryEntry& entry);
 
         private:
             alefbet::pctrl::srv::Service* service_ = nullptr;
