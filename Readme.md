@@ -8,7 +8,7 @@ It can be used freely.
 
 ## Current version
 
-1.0.0 (MVP)
+1.0.2
 
 ## Users categories
 
@@ -26,7 +26,7 @@ Parental control has the following features:
 - When the time is out, the system is blocked
 
 **Administrator** (protected by a PIN code)
-- Define a PIN to protect setup access
+- Define a PIN to protect setup access - *default PIN is A A A A*
 - Enable or disable the parental control
 
 ## Coming features
