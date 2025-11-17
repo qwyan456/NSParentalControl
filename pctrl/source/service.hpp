@@ -39,11 +39,12 @@ namespace alefbet::pctrl::srv {
                 monitor_ = monitor;
             }
 
+            void showScreenTimeout();
+
         private:
             Ipc::Result commandThread(Ipc::Request*);
 
-            // Handlers
-            void showScreenTimeout();
+            // Handlers            
             Ipc::Result getRunningApplication(Ipc::Request*);
             Ipc::Result getCurrentUserUid(Ipc::Request*);
             Ipc::Result getCurrentUserNickname(Ipc::Request*);

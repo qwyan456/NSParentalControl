@@ -16,13 +16,13 @@ using namespace alefbet::pctrl::logger;
 constexpr u32 ScreenWidth = 1920;       ///< Width of the Screen
 constexpr u32 ScreenHeight = 1080;      ///< Height of the Screen
 
-extern "C" {    
+/*extern "C" {    
     alignas(ams::os::MemoryPageSize) constinit u8 g_nv_transfer_memory[0x40000];
     extern "C" ::Result __nx_nv_create_tmem(TransferMemory *t, u32 *out_size, Permission perm) {
         *out_size = sizeof(g_nv_transfer_memory);
         return tmemCreateFromMemory(t, g_nv_transfer_memory, sizeof(g_nv_transfer_memory), perm);
     }
-}
+}*/
 
 namespace alefbet {
     namespace pctrl {

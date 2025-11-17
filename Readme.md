@@ -8,7 +8,7 @@ It can be used freely.
 
 ## Current version
 
-1.0.2
+1.1.0
 
 ## Users categories
 

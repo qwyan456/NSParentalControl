@@ -32,6 +32,7 @@
 using namespace alefbet::pctrl::logger;
 using namespace alefbet::pctrl::database;
 using namespace alefbet::pctrl::helpers;
+
 constexpr std::string NullString = std::string("(NULL)");
 constexpr u64 DefaultPin[] = { HidNpadButton_A, HidNpadButton_A, HidNpadButton_A, HidNpadButton_A };
 
@@ -44,11 +45,7 @@ namespace alefbet::pctrl::srv {
             return static_cast<uint32_t>(this->commandThread(r));
         });
         logToFile("[Service] service started\n");
-
-        /* Load shared font. */
-        //alefbet::pctrl::font::InitializeSharedFont();
-        //logToFile("[Service] Shared font loaded\n");
-
+        
         /* Verify whether the service is enabled */
         auto settings = loadSettings();
 
@@ -66,38 +63,34 @@ namespace alefbet::pctrl::srv {
         void reboot_to_payload(void) {
             helpers::rebootToPayload();
         }
-        
     }
 
     void Service::showScreenTimeout() {        
-        logToFile("[Service] Test requested\n");        
-
-        // Block unless a button has been pressed
-        /*PadState pad;
-        padConfigureInput(1, HidNpadStyleSet_NpadStandard);
-        padInitializeAny(&pad);*/
+        logToFile("[Service] Requested to show timeout screen\n");                        
 
         gui_.showScreenTimeout();
 
-        /*while(true) {
-            padUpdate(&pad);
-            u64 kDown = padGetButtonsDown(&pad);
-        
-            if(kDown & HidNpadButton_Minus) {
-                logToFile("[Service] User wants to shutdown\n");
-                #ifdef PSEC_DEBUG
-                    // In debug mode we only hide the screen
-                    gui_.HideScreen();
-                #else 
-                    // Otherwise we shut the system down
-                    actions::reboot_to_payload();
-                #endif
+        // Wait for Vol+
+        // Block unless a button has been pressed
+        GpioPadSession g_volup;
+        gpioInitialize();
+        gpioOpenSession(&g_volup, GpioPadName_ButtonVolUp);
+        GpioValue value;
 
-                return; //Stop monitoring the buttons
-            }
+        while(true) {            
+            gpioPadGetValue(&g_volup, &value);
 
-            svcSleepThread(100'000);
-        }*/
+            if(value == 0) {
+                logToFile("[GUI] Vol+ pressed.\n");
+                actions::reboot_to_payload();
+                break;
+            }  
+            
+            // Wait a little
+            svcSleepThread(50e6); // 50 ms
+        }
+
+        gpioExit();
     }
 
     Ipc::Result Service::getRunningApplication(Ipc::Request* request) {
@@ -468,6 +461,13 @@ namespace alefbet::pctrl::srv {
         std::string _ver = VERSION;
         request->appendReplyValue(_ver);
         return Ipc::Result::Ok;
+    }    
+
+    void delayedTimeout(void* arg) {
+        logToFile("[Service] Delayed task\n");
+        Service* svc = static_cast<Service*>(arg);
+        svcSleepThread(5'000'000'000LL);
+        svc->showScreenTimeout();
     }
 
     Ipc::Result Service::commandThread(Ipc::Request* request) {
@@ -479,7 +479,11 @@ namespace alefbet::pctrl::srv {
                 return getCurrentVersion(request);
             }
             case Ipc::Command::Test: {
-                showScreenTimeout();
+                logToFile("[Service] Schedule timeout screen in 5 seconds...\n");
+                Thread t;
+                threadCreate(&t, delayedTimeout, this, NULL, 0x4000, 0x2c, -2);
+                threadStart(&t);
+
                 break;
             }
             case Ipc::Command::GetCurrentUserUid: {

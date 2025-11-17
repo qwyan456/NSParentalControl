@@ -7,6 +7,7 @@
 #include <string_view>
 #include <ranges>
 #include <codecvt>
+#include <switch.h>
 #include "logger.h"
 #include "ams_bpc.h"
 
@@ -15,6 +16,8 @@ using namespace alefbet::pctrl::structs;
 using std::operator""sv;
 
 namespace alefbet::pctrl::helpers {
+    static FsFileSystem sdmc;
+
     std::string titleIdToString(u64 titleId) {
         if(titleId == 0) {
             return std::string("None");        
@@ -179,79 +182,91 @@ namespace alefbet::pctrl::helpers {
         return std::string(buffer);
     }
 
-    /*bool shutdown() {
-        logToFile("[Helpers] Try to shutdown...\n");
+    bool readPayloadFile(u8* buffer, u64 buffer_size) {
+        FsFile handle;
+        
+        ::Result res = fsOpenSdCardFileSystem(&sdmc);
+        if(R_FAILED(res)) {
+            logToFile("[Helpers] Could not open SDMC\n");
+            return false;
+        }
 
-        ams::pmic::ShutdownSystem(false);        
-    }*/
+        res = fsFsOpenFile(&sdmc, "/atmosphere/reboot_payload.bin", FsOpenMode_Read, &handle);
+        if(R_FAILED(res)) {
+            logToFile("[Helpers] Could not open payload file\n");
+            return false;
+        }
+
+        s64 fileSize = 0;
+        res = fsFileGetSize(&handle, &fileSize);
+        if(R_FAILED(res)) {
+            logToFile("[Helpers] Could not get file size\n");
+            fsFileClose(&handle);
+            return false;
+        }
+
+        logToFile("[Helpers] Payload file size is %i bytes\n", fileSize);
+
+        u64 dataRead = 0;
+        res = fsFileRead(&handle, 0, buffer, buffer_size, FsReadOption_None, &dataRead);
+        if(R_FAILED(res)) {
+            logToFile("[Helpers] Could not read %i bytes from payload file\n", buffer_size);
+            fsFileClose(&handle);
+            return false;
+        }
+
+        fsFileClose(&handle);
+
+        logToFile("[Helpers] Read %i bytes from payload file\n", dataRead);
+        return true;
+    }
 
     #define IRAM_PAYLOAD_MAX_SIZE 0x24000
     //static u8 g_reboot_payload[IRAM_PAYLOAD_MAX_SIZE];
     bool rebootToPayload() {
         logToFile("[Helpers] Try to reboot to payload\n");
-
-        bpcRebootSystem();
-        return true;
-
-        /*::Result rc = spsmInitialize();
-        if(rc != 0) {
-            logToFile("[Helpers] Failed to initialize SPSM\n");
+      
+        u8 *g_reboot_payload = new u8[IRAM_PAYLOAD_MAX_SIZE];
+        smInitialize();
+        if(!readPayloadFile(g_reboot_payload, IRAM_PAYLOAD_MAX_SIZE)) {
+            logToFile("[Helpers] No payload, shutting down.");
             bpcShutdownSystem();
             return false;
         }
 
-        smExit(); //Required to connect to ams:bpc            
+        logToFile("1\n");
+        ::Result rc = spsmInitialize();        
+        if(R_FAILED(rc)) {
+            logToFile("[Helpers] Failed to initialize SPSM\n");
+            bpcShutdownSystem();
+            return false;
+        }
+        logToFile("2\n");
+        
+        smExit(); //Required to connect to ams:bpc       
+        logToFile("3\n");
+
         rc = amsBpcInitialize();
-        if (rc != 0) {
+        if (R_FAILED(rc)) {
             logToFile("[Helpers] Failed to initialize ams:bpc: %i\n", rc);
             logToFile("[Helpers] Shutting down.\n");
             bpcShutdownSystem();
             return false;
         }
+        logToFile("4\n");        
 
-        static FileHandle handle;
-        bool opened = OpenFile(std::addressof(handle), "sdmc:/atmosphere/reboot_payload.bin", OpenMode_Read).IsSuccess();
-        //FILE *f = fopen("sdmc:/atmosphere/reboot_payload.bin", "rb");
-        if (!opened) {
-            logToFile("[Helpers] Failed to load /atmosphere/reboot_payload.bin!\n");
-            logToFile("[Helpers] Shutting down.\n");
-            bpcShutdownSystem();
-            return false;
-        } else {
-            logToFile("[Helpers] Payload file opened\n");
-            s64 file_size = 0;
-            if(GetFileSize(&file_size, handle).IsFailure()) {
-                logToFile("[Helpers] Failed to get payload file size\n");
-                logToFile("[Helpers] Shutting down.\n");
-                bpcShutdownSystem();
-                return false;
-            }
-
-            logToFile("[Helpers] Paylaod file read\n");
-            if(ReadFile(handle, 0, g_reboot_payload, file_size).IsFailure()) {
-                logToFile("[Helpers] Could not read the payload\n");
-                CloseFile(handle);
-                logToFile("[Helpers] Shutting down.\n");
-                bpcShutdownSystem();
-                return false;
-            }
-
-            CloseFile(handle);            
-            //fread(g_reboot_payload, 1, sizeof(g_reboot_payload), f);
-            //fclose(f);
-        }
-
-        logToFile("[Helpers] Calling amsBpcSetRebootPayload\n");
-        rc = amsBpcSetRebootPayload(g_reboot_payload, IRAM_PAYLOAD_MAX_SIZE);
-        if (rc != 0) {
+        logToFile("[Helpers] Calling amsBpcSetRebootPayload\n");        
+        if (R_FAILED(amsBpcSetRebootPayload(g_reboot_payload, IRAM_PAYLOAD_MAX_SIZE))) {
             logToFile("[Helpers] Failed to set reboot to payload: %i\n", rc);
             logToFile("[Helpers] Shutting down.\n");
+
             bpcShutdownSystem();
         } else {
             logToFile("[Helpers] Rebooting to payload\n");
-            spsmShutdown(true);            
+
+            spsmShutdown(true);
         }
 
-        return true;*/
+        return true;
     }
 }
