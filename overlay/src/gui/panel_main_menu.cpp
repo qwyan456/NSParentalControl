@@ -29,6 +29,10 @@ bool MainMenuPanel::isParentalControlEnabled() {
     return getAppContext().is_enabled;
 }
 
+bool MainMenuPanel::isParentalControlInstalled() {
+    return getAppContext().is_available;
+}
+
 std::list<std::string> MainMenuPanel::getUsersList() {
     std::list<std::string> users;
 
@@ -36,7 +40,7 @@ std::list<std::string> MainMenuPanel::getUsersList() {
 }
 
 tsl::elm::Element* MainMenuPanel::createUI() {
-    std::string subTitle = isParentalControlEnabled() ? "Parental Control is Enabled" : "Parental Control is Disabled";    
+    std::string subTitle = isParentalControlInstalled() ? isParentalControlEnabled() ? "Parental Control is Enabled" : "Parental Control is Disabled" : "Parental Control is not installed";
 
     rootFrame_ = new tsl::elm::OverlayFrame("Parental Control", subTitle);
     rootList_ = new tsl::elm::List();

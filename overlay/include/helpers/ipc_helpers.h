@@ -13,6 +13,8 @@ namespace alefbet::pctrl::ipc {
     using UserNickname = std::string;
     constexpr int UserUidMaxLength = 39;
 
+    bool isAvailable();
+
     void startTest();
     UserUid getCurrentUserUid();
     UserNickname getCurrentUserNickname();

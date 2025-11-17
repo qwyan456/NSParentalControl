@@ -11,8 +11,17 @@ namespace alefbet::pctrl::ipc {
 
     constexpr u8 PIN_LEN_MAX = 20*4+3;
 
+    bool isAvailable() {
+        return getAppContext().is_available;
+    }
+
     void startTest() {
         logToFile("[IPC] starting test");
+
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return;
+        }
             
         auto& service = getAppContext().pctrl_service;
         Result res = serviceDispatch(&service, (u32)Ipc::Command::Test); 
@@ -28,6 +37,11 @@ namespace alefbet::pctrl::ipc {
 
     UserUid getCurrentUserUid() {
         logToFile("[IPC] Get current user Uid");
+
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return "";
+        }
 
         auto& service = getAppContext().pctrl_service;
         char currentUser[50] = {0};
@@ -49,6 +63,11 @@ namespace alefbet::pctrl::ipc {
     UserNickname getCurrentUserNickname() {
         logToFile("[IPC] Get current user Nickname");
 
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return "";
+        }
+
         auto& service = getAppContext().pctrl_service;
         char currentUser[21] = {0};
         Result res = serviceDispatchOut(&service, (u32)Ipc::Command::GetCurrentUserNickname, currentUser);
@@ -66,6 +85,11 @@ namespace alefbet::pctrl::ipc {
 
     std::string getCurrentTitle() {
         logToFile("[IPC] Get current title");
+
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return "";
+        }
 
         auto& service = getAppContext().pctrl_service;
         char cAppName[512] = {0};
@@ -85,6 +109,11 @@ namespace alefbet::pctrl::ipc {
     u16 getUserUsageTime() {
         logToFile("[IPC] Get usage time for the user");
                 
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return 0;
+        }
+
         auto& service = getAppContext().pctrl_service;
         u16 usageTime = 0;
         
@@ -100,6 +129,11 @@ namespace alefbet::pctrl::ipc {
     u16 getUserRemainingTime() {
         logToFile("[IPC] Get remaining time for the user");
         
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return 0;
+        }
+
         auto& service = getAppContext().pctrl_service;
         u16 remainingTime = 0;
         Result res = serviceDispatchOut(&service, (u32)Ipc::Command::GetUserRemainingTime, remainingTime);
@@ -113,6 +147,11 @@ namespace alefbet::pctrl::ipc {
 
     std::string encodeAdminPin(const std::vector<u64>& keys) {
         std::string pin;
+
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return "";
+        }
 
         if(keys.size() != 4) {
             logToFile("[IPC] The PIN size is wrong.");
@@ -151,6 +190,11 @@ namespace alefbet::pctrl::ipc {
     bool verifyPin(const std::vector<u64>& pin) {
         logToFile("[IPC] Verify Admin PIN");
 
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return false;
+        }
+
         auto& service = getAppContext().pctrl_service;
         bool verified = false;
         u64 a_pin[4] = { 
@@ -171,6 +215,11 @@ namespace alefbet::pctrl::ipc {
 
     bool setupPin(const std::vector<u64>& pin) {
         logToFile("[IPC] Setup new PIN");
+
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return false;
+        }
 
         auto& service = getAppContext().pctrl_service;
         //char pin_str[PIN_LEN_MAX+1] = {0};
@@ -193,6 +242,11 @@ namespace alefbet::pctrl::ipc {
     bool setWorkingMode(const WorkingMode& mode) {
         logToFile("[IPC] Setting working mode");
 
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return false;
+        }
+
         auto& service = getAppContext().pctrl_service;
         int _mode = (u8)mode;
         Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetWorkingMode, _mode);
@@ -207,6 +261,11 @@ namespace alefbet::pctrl::ipc {
 
     WorkingMode getWorkingMode() {
         logToFile("[IPC] Getting working mode");
+
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return WorkingModeBlocking;
+        }
 
         u8 workingMode = WorkingModeInfo;
 
@@ -229,6 +288,11 @@ namespace alefbet::pctrl::ipc {
         logToFile("[IPC] Setting remaining time visibility:");
         logToFile(active ? "true" : "false");
 
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return false;
+        }
+
         auto& service = getAppContext().pctrl_service;
         Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetShowRemainingTime, active);
 
@@ -242,6 +306,11 @@ namespace alefbet::pctrl::ipc {
 
     bool getShowRemainingTime() {
         logToFile("[IPC] Getting remaining time visibility");
+
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return false;
+        }
 
         u8 visible = 0;
 
@@ -261,6 +330,11 @@ namespace alefbet::pctrl::ipc {
         else 
             logToFile("[IPC] Setting service disabled");
 
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return false;
+        }
+
         auto& service = getAppContext().pctrl_service;
         Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetEnabled, enabled);
 
@@ -274,6 +348,11 @@ namespace alefbet::pctrl::ipc {
 
     bool isEnabled() {
         logToFile("[IPC] Getting current state of the service");
+
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return false;
+        }
 
         u8 enabled = 0;
 
@@ -293,6 +372,11 @@ namespace alefbet::pctrl::ipc {
     std::string getVersion() {
         logToFile("[IPC] Getting sysmodule version");
 
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return "";
+        }
+
         char version[10] = {0};
 
         auto& service = getAppContext().pctrl_service;
@@ -311,6 +395,11 @@ namespace alefbet::pctrl::ipc {
     u16 getDailyLimit() {
         logToFile("[IPC] Getting daily limit");
 
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return 0;
+        }
+
         u16 limit = 0;
 
         auto& service = getAppContext().pctrl_service;
@@ -328,6 +417,11 @@ namespace alefbet::pctrl::ipc {
 
     bool setDailyLimit(const u16& limit) {
         logToFile("[IPC] Setting the daily limit");
+
+        if(!isAvailable()) {
+            logToFile("[IPC] service  not available");
+            return false;
+        }
 
         auto& service = getAppContext().pctrl_service;
         Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetDailyLimit, limit);

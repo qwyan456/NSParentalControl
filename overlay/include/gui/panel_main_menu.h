@@ -19,6 +19,7 @@ private:
     void closeAndClean();    
     std::list<std::string> getUsersList();
     bool isParentalControlEnabled();    
+    bool isParentalControlInstalled();
 
 private:    
     bool dirty_ = false;
