@@ -62,7 +62,7 @@ void AdminMenuPanel::rebuildUI() {
     // Set working mode
     const auto& workingMode = ipc::getWorkingMode();
 
-    auto entrySetWorkingMode = new tsl::elm::ToggleListItem("Working mode", workingMode, "Blocking", "Information");
+    /*auto entrySetWorkingMode = new tsl::elm::ToggleListItem("Working mode", workingMode, "Blocking", "Information");
     rootList_->addItem(entrySetWorkingMode);
     entrySetWorkingMode->setClickListener([entrySetWorkingMode](u64 keys) -> bool {
         if(keys & HidNpadButton_A) {            
@@ -74,7 +74,9 @@ void AdminMenuPanel::rebuildUI() {
         }
 
         return false;
-    });
+    });*/
+    auto entrySetWorkingMode = new tsl::elm::ListItem("WorkingMode", "Blocking");
+    rootList_->addItem(entrySetWorkingMode);
 
     // Setup limits
     auto entryLimits = new tsl::elm::ListItem("Setup limits");
@@ -89,7 +91,7 @@ void AdminMenuPanel::rebuildUI() {
     });
 
     rootList_->addItem(new tsl::elm::CategoryHeader("Versions"));
-    rootList_->addItem(new tsl::elm::ListItem("Overlay", VERSION));
+    rootList_->addItem(new tsl::elm::ListItem("Overlay", "v" +std::string(VERSION)));
     rootList_->addItem(new tsl::elm::ListItem("Sysmodule", ipc::getVersion()));        
 
 
