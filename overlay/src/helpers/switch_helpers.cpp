@@ -85,6 +85,30 @@ namespace alefbet {
 
                 return uid;
             }
+
+            /*std::string getTitleName(u64 titleId) {
+                NsApplicationControlData buffer;
+                u64 actual_size = 0;
+                
+                ::Result rc = nsInitialize();
+                if(R_FAILED(rc)) {
+                    logToFile("[Helpers] Failed to connect to ns service");
+                    return "Unknown";
+                }
+
+                rc = nsGetApplicationControlData(NsApplicationControlSource_Storage, titleId, std::addressof(buffer), sizeof(buffer), &actual_size);
+                if(R_FAILED(rc)) {
+                    logToFile("[Helpers] Could not get application control data for title");
+                    logIntToFile(titleId);
+                    nsExit();
+                    return "Unknown";
+                }
+
+                nsExit();
+
+                logToFile(buffer.nacp.lang[0].name);
+                return std::string(buffer.nacp.lang[0].name);            
+            }*/
         }
     }
 }

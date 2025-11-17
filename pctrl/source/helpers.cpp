@@ -55,7 +55,7 @@ namespace alefbet::pctrl::helpers {
         UserData user;
 
         ::Result rc = accountInitialize(AccountServiceType_Administrator);
-        if(rc != 0) {
+        if(R_FAILED(rc)) {
             logToFile("[Helpers] Could not initialize account service: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             user.nickname = UserNickname("ERR#003");
             return user;
@@ -65,7 +65,7 @@ namespace alefbet::pctrl::helpers {
         AccountUserData user_data;
         AccountProfileBase base;
         rc = accountGetProfile(&profile, uid); 
-        if(rc != 0) {
+        if(R_FAILED(rc)) {
             logToFile("[Helpers] Could not get account profile: %i\n", rc);
             accountExit();
             user.nickname = UserNickname("ERR#005");
@@ -75,7 +75,7 @@ namespace alefbet::pctrl::helpers {
         }
 
         rc = accountProfileGet(&profile, &user_data, &base);
-        if(rc != 0) {
+        if(R_FAILED(rc)) {
             logToFile("[Helpers] Could not get user data: %i\n", rc);
             accountProfileClose(&profile);
             accountExit();
@@ -100,7 +100,7 @@ namespace alefbet::pctrl::helpers {
         UserData user;
 
         ::Result rc = accountInitialize(AccountServiceType_Administrator);
-        if(rc != 0) {
+        if(R_FAILED(rc)) {
             logToFile("[Helpers] Could not initialize account service: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             user.nickname = UserNickname("ERR#003");
             return user;
@@ -110,7 +110,7 @@ namespace alefbet::pctrl::helpers {
         rc = accountGetPreselectedUser(&uid);
         //logToFile("rc=%i, Uid=%i.%i\n", rc, uid.uid[0], uid.uid[1]);
         rc = accountGetLastOpenedUser(&uid);            
-        if(rc != 0) {
+        if(R_FAILED(rc)) {
             logToFile("[Helpers] Could not get preselected user: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             accountExit();
             user.nickname = UserNickname("ERR#004");
@@ -124,7 +124,7 @@ namespace alefbet::pctrl::helpers {
         AccountUserData user_data;
         AccountProfileBase base;
         rc = accountGetProfile(&profile, uid); 
-        if(rc != 0) {
+        if(R_FAILED(rc)) {
             logToFile("[Helpers] Could not get account profile: %i\n", rc);
             accountExit();
             user.nickname = UserNickname("ERR#005");
@@ -134,7 +134,7 @@ namespace alefbet::pctrl::helpers {
         }
 
         rc = accountProfileGet(&profile, &user_data, &base);
-        if(rc != 0) {
+        if(R_FAILED(rc)) {
             logToFile("[Helpers] Could not get user data: %i\n", rc);
             accountProfileClose(&profile);
             accountExit();
@@ -157,7 +157,7 @@ namespace alefbet::pctrl::helpers {
         u64 process_id = 0;                        
 
         ::Result rc = pmdmntGetApplicationProcessId(&process_id);
-        if(rc != 0) {
+        if(R_FAILED(rc)) {
             //logToFile("[Helpers] Could not get application process ID: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return 0;
         }
@@ -171,7 +171,7 @@ namespace alefbet::pctrl::helpers {
         u64 title_id = 0;
 
         ::Result rc = pmdmntGetProgramId(&title_id, process_id);
-        if(rc != 0) {
+        if(R_FAILED(rc)) {
             //logToFile("[Helpers] Could not get the title ID for the process %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return 0;
         }
@@ -183,16 +183,19 @@ namespace alefbet::pctrl::helpers {
     }
 
     std::string getApplicationName(u64 title_id) {
-        NsApplicationControlData buffer;
+        NsApplicationControlData control;
         u64 actual_size = 0;
         
-        ::Result rc = nsGetApplicationControlData(NsApplicationControlSource_Storage, title_id, std::addressof(buffer), sizeof(buffer), &actual_size);
+        ::Result rc = nsGetApplicationControlData(NsApplicationControlSource_Storage, title_id, std::addressof(control), sizeof(control), &actual_size);
         if(R_FAILED(rc)) {
             logToFile("[Helpers] Could not get application control data for title %s\n", titleIdToString(title_id));
             return "Unknown";
         }
 
-        return std::string(buffer.nacp.lang[0].name);
+        NacpLanguageEntry* langEntry = nullptr;
+        rc = nacpGetLanguageEntry(&control.nacp, &langEntry);
+
+        return std::string(langEntry->name);
     }
 
     std::string today() {        

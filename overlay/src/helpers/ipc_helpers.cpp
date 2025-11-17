@@ -86,6 +86,10 @@ namespace alefbet::pctrl::ipc {
     std::string getCurrentTitle() {
         logToFile("[IPC] Get current title");
 
+        /*logToFile("Test"); 
+        std::string _name = helpers::getTitleName(418111488);
+        logToFile(_name.c_str());*/
+
         if(!isAvailable()) {
             logToFile("[IPC] service not available");
             return "";
