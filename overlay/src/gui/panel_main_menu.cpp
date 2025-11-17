@@ -9,6 +9,7 @@
 #include "panel_admin_menu.h"
 #include "panel_verifypin.h"
 #include "panel_setup_limits.h"
+#include "panel_history_main.h"
 #include "AppContext.h"
 #include "helpers/ipc_helpers.h"
 
@@ -93,7 +94,8 @@ void MainMenuPanel::rebuildUI() {
         rootList_->addItem(new tsl::elm::ListItem("No user / app started"));
     }        
 
-    const auto& remainingTimeVisibility = ipc::getShowRemainingTime();
+    if(false) { // Disabled
+        const auto& remainingTimeVisibility = ipc::getShowRemainingTime();
         auto entryShowRemainingTime = new tsl::elm::ToggleListItem("Remaining time visible", remainingTimeVisibility);
         rootList_->addItem(entryShowRemainingTime);
         entryShowRemainingTime->setClickListener([this, entryShowRemainingTime](u64 keys) -> bool {
@@ -109,6 +111,19 @@ void MainMenuPanel::rebuildUI() {
             }
 
             return false;
+        }); 
+    }
+
+    // History
+    auto entryShowHistory = new tsl::elm::ListItem("Usage history");
+    rootList_->addItem(entryShowHistory);
+    entryShowHistory->setClickListener([this, entryShowHistory](u64 keys) -> bool {
+        if(keys & HidNpadButton_A) {            
+            tsl::changeTo<HistoryMainPanel>();
+            return true;
+        }
+
+        return false;
     }); 
     
     // Debug menu

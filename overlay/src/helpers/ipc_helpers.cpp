@@ -2,14 +2,14 @@
 #include "logger.h"
 #include "AppContext.h"
 #include "Command.hpp"
-#include <string_view>
-#include <ranges>
 #include <string>
 #include <cstring>
 
 namespace alefbet::pctrl::ipc {
-
+    
+    using namespace std::chrono;
     constexpr u8 PIN_LEN_MAX = 20*4+3;
+    constexpr u8 ACC_USER_NICKNAME_MAX = 0x20;
 
     bool isAvailable() {
         return getAppContext().is_available;
@@ -19,7 +19,7 @@ namespace alefbet::pctrl::ipc {
         logToFile("[IPC] starting test");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return;
         }
             
@@ -34,12 +34,12 @@ namespace alefbet::pctrl::ipc {
 
         logToFile("[IPC] service dispatch OK");
     }
-
+    
     UserUid getCurrentUserUid() {
         logToFile("[IPC] Get current user Uid");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return "";
         }
 
@@ -64,7 +64,7 @@ namespace alefbet::pctrl::ipc {
         logToFile("[IPC] Get current user Nickname");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return "";
         }
 
@@ -87,7 +87,7 @@ namespace alefbet::pctrl::ipc {
         logToFile("[IPC] Get current title");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return "";
         }
 
@@ -106,50 +106,73 @@ namespace alefbet::pctrl::ipc {
         return title;
     }
 
-    u16 getUserUsageTime() {
+    minutes getUserUsageTime(const AccountUid& accountUid) {
         logToFile("[IPC] Get usage time for the user");
                 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
-            return 0;
+            logToFile("[IPC] service not available");
+            return minutes(0);
         }
 
         auto& service = getAppContext().pctrl_service;
         u16 usageTime = 0;
-        
-        Result res = serviceDispatchOut(&service, (u32)Ipc::Command::GetUserUsageTime, usageTime);
+        Result res = 0;
+        UserUid uid = accountUidToString(accountUid);
+
+        if(!accountUidIsValid(&accountUid)) {
+            logToFile("Query usage time for current user");
+            res = serviceDispatchOut(&service, (u32)Ipc::Command::GetUserUsageTime, usageTime);
+        } else {
+            logToFile("Query usage time for");
+            char _uid[40] = {0};
+            std::memcpy(_uid, uid.data(), uid.length());
+            logToFile(_uid);
+            res = serviceDispatchInOut(&service, (u32)Ipc::Command::GetUserUsageTime, _uid, usageTime);
+        }
 
         if(R_FAILED(res)) {
             logToFile("[IPC] An error occured while queriying the usage time for the user");
         }
 
-        return usageTime;
+        return std::chrono::minutes(usageTime);
     }
 
-    u16 getUserRemainingTime() {
+    minutes getUserRemainingTime(const AccountUid& accountUid) {
         logToFile("[IPC] Get remaining time for the user");
         
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
-            return 0;
+            logToFile("[IPC] service not available");
+            return minutes(0);
         }
 
         auto& service = getAppContext().pctrl_service;
         u16 remainingTime = 0;
-        Result res = serviceDispatchOut(&service, (u32)Ipc::Command::GetUserRemainingTime, remainingTime);
+        UserUid uid = accountUidToString(accountUid);
+        Result res = 0;
+        
+        if(!accountUidIsValid(&accountUid)) {
+            logToFile("Query usage time for current user");
+            res = serviceDispatchOut(&service, (u32)Ipc::Command::GetUserRemainingTime, remainingTime);
+        } else {
+            logToFile("Query usage time for");
+            char _uid[40] = {0};
+            std::memcpy(_uid, uid.data(), uid.length());
+            logToFile(_uid);
+            res = serviceDispatchInOut(&service, (u32)Ipc::Command::GetUserRemainingTime, _uid, remainingTime);
+        }
 
         if(R_FAILED(res)) {
             logToFile("[IPC] An error occured while queriying the remaining time for the user");
         }
 
-        return remainingTime;
+        return std::chrono::minutes(remainingTime);
     }
 
     std::string encodeAdminPin(const std::vector<u64>& keys) {
         std::string pin;
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return "";
         }
 
@@ -191,7 +214,7 @@ namespace alefbet::pctrl::ipc {
         logToFile("[IPC] Verify Admin PIN");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return false;
         }
 
@@ -217,7 +240,7 @@ namespace alefbet::pctrl::ipc {
         logToFile("[IPC] Setup new PIN");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return false;
         }
 
@@ -243,7 +266,7 @@ namespace alefbet::pctrl::ipc {
         logToFile("[IPC] Setting working mode");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return false;
         }
 
@@ -263,7 +286,7 @@ namespace alefbet::pctrl::ipc {
         logToFile("[IPC] Getting working mode");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return WorkingModeBlocking;
         }
 
@@ -289,7 +312,7 @@ namespace alefbet::pctrl::ipc {
         logToFile(active ? "true" : "false");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return false;
         }
 
@@ -308,7 +331,7 @@ namespace alefbet::pctrl::ipc {
         logToFile("[IPC] Getting remaining time visibility");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return false;
         }
 
@@ -331,7 +354,7 @@ namespace alefbet::pctrl::ipc {
             logToFile("[IPC] Setting service disabled");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return false;
         }
 
@@ -350,7 +373,7 @@ namespace alefbet::pctrl::ipc {
         logToFile("[IPC] Getting current state of the service");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return false;
         }
 
@@ -373,7 +396,7 @@ namespace alefbet::pctrl::ipc {
         logToFile("[IPC] Getting sysmodule version");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return "";
         }
 
@@ -396,7 +419,7 @@ namespace alefbet::pctrl::ipc {
         logToFile("[IPC] Getting daily limit");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return 0;
         }
 
@@ -419,7 +442,7 @@ namespace alefbet::pctrl::ipc {
         logToFile("[IPC] Setting the daily limit");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service  not available");
+            logToFile("[IPC] service not available");
             return false;
         }
 
@@ -433,4 +456,5 @@ namespace alefbet::pctrl::ipc {
 
         return true;
     }
+
 }

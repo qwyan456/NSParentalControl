@@ -14,7 +14,7 @@ namespace alefbet::pctrl {
             UserNickname nickname;
 
             bool isValid() const {
-                return uid.uid[0] > 0 && uid.uid[1] > 0 && !nickname.empty() && nickname.substr(0, 4) != "ERR#";
+                return accountUidIsValid(&uid) && nickname.substr(0, 4) != "ERR#";
             }
         } UserData;
 
@@ -26,6 +26,7 @@ namespace alefbet::pctrl {
         AccountUid accountUidFromString(const UserUid& uid);
 
         structs::UserData getCurrentUser();
+        structs::UserData getUserFromAccountUid(AccountUid uid);
         u64 getRunningApplicationPid();
         u64 getRunningApplicationTitleId(u64 process_id);
         std::string getApplicationName(u64 title_id);

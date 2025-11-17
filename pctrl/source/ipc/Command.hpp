@@ -7,7 +7,7 @@ namespace Ipc {
         Version,                    /*! Queries the server version. Result: the version as a string. */
         Test,                       /*! Triggers a test of the service. Result: none. */
         Initialize,                 /*! Triggers the initialization of the system. */
-        GetUsersList,               /*! Queries the current users list. Returns a list of strings containing the users names registered on the system. */
+        GetUsersList,               /*! DEPRECATED - Queries the current users list. Returns a list of strings containing the users names registered on the system. */
         GetUserUsageTime,           /*! Queries a user's usage data. Returns a data structure with the information of the user. */
         GetUserRemainingTime,       /*! Queries a user's remaining time. Returns the remaining time in minutes as an integer. */
         GetCurrentUserUid,          /*! Returns the current profile Uid as a string. */

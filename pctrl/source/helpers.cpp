@@ -51,6 +51,51 @@ namespace alefbet::pctrl::helpers {
         return uid;
     }
 
+    UserData getUserFromAccountUid(AccountUid uid) {
+        UserData user;
+
+        ::Result rc = accountInitialize(AccountServiceType_Administrator);
+        if(rc != 0) {
+            logToFile("[Helpers] Could not initialize account service: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+            user.nickname = UserNickname("ERR#003");
+            return user;
+        }
+
+        AccountProfile profile;
+        AccountUserData user_data;
+        AccountProfileBase base;
+        rc = accountGetProfile(&profile, uid); 
+        if(rc != 0) {
+            logToFile("[Helpers] Could not get account profile: %i\n", rc);
+            accountExit();
+            user.nickname = UserNickname("ERR#005");
+            return user;
+        } else {
+            logToFile("[Helpers] accountGetProfile() ok\n");
+        }
+
+        rc = accountProfileGet(&profile, &user_data, &base);
+        if(rc != 0) {
+            logToFile("[Helpers] Could not get user data: %i\n", rc);
+            accountProfileClose(&profile);
+            accountExit();
+            user.nickname = UserNickname("ERR#006");
+            return user;
+        } else {
+            logToFile("[Helpers] accountProfileGet() ok\n");
+        }
+        
+        user.uid = uid;
+        user.nickname = UserNickname(base.nickname);
+        UserUid uidstr = accountUidToString(uid);
+        logToFile("[Helpers] uid=%s, Nickname=%s\n", uidstr.c_str(), user.nickname.c_str());
+
+        accountProfileClose(&profile);
+        accountExit();
+
+        return user;
+    }
+
     UserData getCurrentUser() {
         UserData user;
 

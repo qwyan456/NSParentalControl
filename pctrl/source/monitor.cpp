@@ -104,7 +104,8 @@ namespace alefbet::pctrl::srv {
                     u16 remainingTimeInMinutes = daily_limit > entry.durationInMinutes() ? daily_limit - entry.durationInMinutes() : 0;
                     logToFile("[Monitor] Remaining time for user %s is %i minutes. Daily limit=%i\n", user.nickname.c_str(), remainingTimeInMinutes, daily_limit);
 
-                    if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
+                    // DISABLED
+                    /*if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
                         const auto& showRemainingTime = settings[SETTING_SHOW_REMAINING_TIME].int_value > 0;                                                
                         if(showRemainingTime) {
                             if(!service_->gui().isRemainingTimePanelVisible()) {
@@ -115,7 +116,7 @@ namespace alefbet::pctrl::srv {
                             logToFile("[Monitor] Update the remaining time panel\n");
                             service_->gui().updateRemainingTimePanel(remainingTimeInMinutes, daily_limit); 
                         }
-                    }
+                    }*/
                     
                     // After database update we need to verify the limits
                     //const auto remaining_time = remainingTimeInMinutes(entry);                                    
@@ -123,7 +124,7 @@ namespace alefbet::pctrl::srv {
                     if(remainingTimeInMinutes <= 0) {
                         logToFile("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
                         //service_->gui().ShowScreenTimeout();
-                    } /*else {
+                    } /*else { // DISABLED
                         logToFile("[Monitor] Remaining time for user %s is %i minutes.\n", user.nickname.c_str(), remainingTimeInMinutes);
                         service_->gui().updateRemainingTimePanel(remainingTimeInMinutes, daily_limit);
                     }*/
@@ -132,14 +133,15 @@ namespace alefbet::pctrl::srv {
                 }
             } else {
                 logToFile("[Monitor] No title running\n");
-                if(service_->gui().isRemainingTimePanelVisible()) {
+                /*if(service_->gui().isRemainingTimePanelVisible()) { // DISABLED
                     service_->gui().hideRemainingTimePanel();
-                }
+                }*/
                 logToFile("[Monitor] ok\n");
             }
 
+            // DISABLED
             // Sub-loop to monitor games usage and show/hide the remaining time panel
-            for(int i = 0 ; i < MainLoopDelayInNanos.count() / SubLoopDelayInNanos.count() ; ++i) {
+            /*for(int i = 0 ; i < MainLoopDelayInNanos.count() / SubLoopDelayInNanos.count() ; ++i) {
                 pid = getRunningApplicationPid();   
                 if(pid == 0 && service_->gui().isRemainingTimePanelVisible()) {
                     // If no app is running we hide the remaining time panel
@@ -147,10 +149,10 @@ namespace alefbet::pctrl::srv {
                 }
 
                 svcSleepThread(SubLoopDelayInNanos.count()); // Wait a little
-            }
+            }*/
 
             logToFile("[Monitoring] loop\n");
-            //svcSleepThread(MainLoopDelayInNanos.count()); //Wait 1 minute
+            svcSleepThread(MainLoopDelayInNanos.count()); //Wait 1 minute
         }
 
         logToFile("[Monitor] Stopped monitoring.\n");

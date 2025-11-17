@@ -65,7 +65,7 @@ void GuiController::hideScreenTimeout() {
     clearScreen();
 }
 
-void GuiController::showRemainingTimePanel() {
+/*void GuiController::showRemainingTimePanel() {    
     if(remaining_time_visible_) return;
     remaining_time_visible_ = true;
 
@@ -171,7 +171,7 @@ void GuiController::showOverlay(u16 width, u16 height, u16 posX, u16 posY) {
     clearScreen();
 
     //requestForeground(true);
-}
+}*/
 
 void GuiController::clearScreen() {
     auto& renderer = Renderer::get();

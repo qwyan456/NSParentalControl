@@ -17,6 +17,8 @@
 #include <thread>
 #include <cstring>
 #include <map>
+#include <list>
+#include <sstream>
 #include "service.hpp"
 #include "logger.h"
 #include "ipc/Command.hpp"
@@ -144,18 +146,29 @@ namespace alefbet::pctrl::srv {
         return Ipc::Result::Ok;
     }
 
-    Ipc::Result Service::getUsersList(Ipc::Request*) {
-        // Useful?
+    Ipc::Result Service::getUsersList(Ipc::Request* request) {
+        logToFile("[Service] WARNING! GetUsersList command is deprecated\n");
         return Ipc::Result::Ok;
     }
 
     Ipc::Result Service::getUserRemainingTime(Ipc::Request* request) {
-        //const auto uidS = accountUidFromString(uid);
-        const auto user = helpers::getCurrentUser();
-        if(!user.isValid()) {
-            logToFile("[Service] There is no user\n");
-            request->appendReplyValue(0);
-            return Ipc::Result::Ok;
+        char user_uid[40] = {0};
+        structs::UserData user;
+
+        Ipc::Result rc = request->readRequestValue(user_uid);
+        if(rc != Ipc::Result::Ok) {
+            logToFile("[Service] No user uid sent, using current user\n");
+
+            user = helpers::getCurrentUser();
+            if(!user.isValid()) {
+                logToFile("[Service] There is no user\n");
+                return Ipc::Result::Ok;
+            }
+        } else {
+            // Get the user from the uid sent
+            logToFile("[Service] user Uid received: %s\n", user_uid);
+            const auto& account_uid = accountUidFromString(UserUid(user_uid));
+            user = getUserFromAccountUid(account_uid);
         }
 
         logToFile("[Service] Get usage time for user %s\n", user.nickname.c_str());
@@ -189,13 +202,26 @@ namespace alefbet::pctrl::srv {
     }
 
     Ipc::Result Service::getUserUsageTime(Ipc::Request* request) {
-        const auto user = helpers::getCurrentUser();
-        if(!user.isValid()) {
-            logToFile("[Service] There is no user\n");
-            return Ipc::Result::Ok;
+        char user_uid[40] = {0};
+        structs::UserData user;
+
+        Ipc::Result rc = request->readRequestValue(user_uid);
+        if(rc != Ipc::Result::Ok) {
+            logToFile("[Service] No user uid sent, using current user\n");
+
+            user = helpers::getCurrentUser();
+            if(!user.isValid()) {
+                logToFile("[Service] There is no user\n");
+                return Ipc::Result::Ok;
+            }
+        } else {
+            // Get the user from the uid sent
+            logToFile("[Service] user Uid received: %s\n", user_uid);
+            const auto& account_uid = accountUidFromString(UserUid(user_uid));
+            user = getUserFromAccountUid(account_uid);
         }
 
-        logToFile("[Service] Get remaining time for user %s\n", user.nickname.c_str());
+        logToFile("[Service] Get usage time for user %s\n", user.nickname.c_str());
 
         const auto history = getHistory(user.uid, today());
         auto usage_time_in_minutes = (u16)0;        
@@ -466,7 +492,7 @@ namespace alefbet::pctrl::srv {
     void delayedTimeout(void* arg) {
         logToFile("[Service] Delayed task\n");
         Service* svc = static_cast<Service*>(arg);
-        svcSleepThread(5'000'000'000LL);
+        svcSleepThread(1'000'000'000LL);
         svc->showScreenTimeout();
     }
 
