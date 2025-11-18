@@ -83,11 +83,12 @@ Libraries linked or code reused:
 
 Here are the files and their destination:
 
-| File | Destination |
-|--|--|
-| exefs.nsp | /atmosphere/contents/420000000003103 |
-| toolbox.json | /atmosphere/contents/420000000003103 |
-| parental_control.ovl | /switch/.overlays |
+| File | Destination | Description |
+|--|--|--|
+| exefs.nsp | /atmosphere/contents/420000000003103 | The core of the system as a *sysmodule* |
+| toolbox.json | /atmosphere/contents/420000000003103 | A description file for Atmosphère |
+| boot2.flag | /atmosphere/contents/420000000003103/flags| Needed file to make the sysmodule start at boot |
+| parental_control.ovl | /switch/.overlays | The overlay |
 
 After copying the files, reboot the console.
 
