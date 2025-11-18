@@ -8,6 +8,17 @@ It can be used freely.
 
 1.1.0
 
+## Table of Contents
+
+- [Users categories](#users-categories)
+- [Current features](#current-features)
+- [Coming features](#coming-features)
+- [Screenshots](#screenshots)
+- [Licence](#licence)
+- [Installation](#installation)
+- [Build and install](#build-and-install)
+- [References](#references)
+
 ## Users categories
 
 The following users are involved:
