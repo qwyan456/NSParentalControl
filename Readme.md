@@ -170,3 +170,10 @@ In this folder create an empty file named `boot2.flag`
 
 https://github.com/switchbrew/switch-examples/tree/master
 
+## Credits
+
+- Niels Lohmann <https://nlohmann.me> for JSON C++ library
+- @SciresM for Atmosphère
+- Sean Barrett for STB Truetype
+- @WerWolv for Tesla library
+- @ppkantorski for Ultrahand Overlay

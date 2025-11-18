@@ -93,12 +93,9 @@ extern "C" {
     void testMemory() {
         int on_stack = 0;
         int* on_heap = new int(0);
-        logToFile("@on_stack=%p\n", &on_stack);
-        logToFile("@on_heap=%p\n", (void*)on_heap);
 
         extern char* fake_heap_start;
         extern char* fake_heap_end;
-        logToFile("@fake_heap_start=%p, @fake_heap_end=%p, size==%i\n", (void*)fake_heap_start, (void*)fake_heap_end, (uintptr_t)fake_heap_end-(uintptr_t)fake_heap_start);
 
         //Memory allocation test
         /*for(int s = 0x1000 ; s <= 0x150000 ; s += 5000) {
@@ -128,12 +125,8 @@ namespace alefbet::pctrl {
         alefbet::pctrl::srv::Monitor* monitor = static_cast<alefbet::pctrl::srv::Monitor*>(_args[0]);
         alefbet::pctrl::srv::Service* service = static_cast<alefbet::pctrl::srv::Service*>(_args[1]);
 
-        logToFile("@monitor=%p\n", monitor);
-        logToFile("@service=%p\n", service);
-
-        alefbet::pctrl::srv::Monitor* mon = static_cast<alefbet::pctrl::srv::Monitor*>(monitor);
-        mon->setService(service);
-        mon->loop();
+        monitor->setService(service);
+        monitor->loop();
     }
 
 }
