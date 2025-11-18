@@ -79,9 +79,9 @@ Libraries linked or code reused:
 
 ## Installation
 
-1. Install the required [**Tesla Menu**](https://switch.hacks.guide/homebrew/tesla-menu.html).
+1. Install the required [**Tesla Menu**](https://switch.hacks.guide/homebrew/tesla-menu.html) or [**Ultrahand Overlay**](https://github.com/ppkantorski/Ultrahand-Overlay)
 
-2. Download the latest release from [GitHub](https://github.com/TristanIsrael/NSParentalControl/releases/tag/1.0).
+2. Download the latest release from [GitHub](https://github.com/TristanIsrael/NSParentalControl/releases/tag/1.1).
 
 Here are the files and their destination:
 
@@ -142,7 +142,7 @@ Rename it to `exefs.nsp`.
 
 This file should be copied in the directory `/atmosphere/contents/420000000003103` of the SD card of the Switch.
 
-### Build the ovverlay
+### Build the overlay
 
 Go to the directory `NSParentalControl/overlay`.
 
