@@ -1,12 +1,11 @@
 #include "panel_setuppin.h"
 #include "logger.h"
-#include <tesla.hpp>
 #include <switch.h>
 #include <mutex>
 #include "Command.hpp"
 #include "AppContext.h"
 #include "helpers/ipc_helpers.h"
-#include "panel_setup_menu.h"
+#include "panel_admin_menu.h"
 
 using namespace alefbet::pctrl;
 
@@ -103,7 +102,7 @@ bool SetupPinPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouchState 
 
         // B to cancel
         if(keysDown & HidNpadButton_B) {
-            //tsl::changeTo<SetupMenuPanel>();
+            //tsl::changeTo<AdminMenuPanel>();
             tsl::goBack();
             return true;
         } 

@@ -7,7 +7,7 @@
 #include <switch.h>
 
 #define TESLA_INIT_IMPL
-#include "tesla.hpp"
+#include <tesla.hpp>
 #include "gui/main_overlay.h"
 #include "logger.h"
 #include "AppContext.h"
@@ -21,10 +21,12 @@ bool connectToService() {
     u8 exists(0);
     Result res = tipcDispatchInOut(smGetServiceSessionTipc(), 65100, service_name, exists);
     if(R_FAILED(res) || !exists) {
+        getAppContext().is_available = false;
         logToFile("[Overlay] could not find the service");
         return false;
     } 
         
+    getAppContext().is_available = true;
     logToFile("[Overlay] the service pctrl has been found");    
 
     res = smGetServiceWrapper(&getAppContext().pctrl_service, service_name);

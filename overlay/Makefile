@@ -39,7 +39,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 
 APP_TITLE			:=		Parental Control
-APP_VERSION 	:= 		1.0
+APP_VERSION 	:= 		1.1
 
 TARGET		:=	parental_control
 BUILD		:=	build
@@ -49,20 +49,22 @@ INCLUDES	:=	include include/gui include/helpers ../libtesla/include
 
 NO_ICON		:=  1
 
+include $(TOPDIR)/../libultrahand/ultrahand.mk
+
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 
-CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
+CFLAGS	:=	-g -Wall -O2 -ffunction-sections -fdata-sections -flto \
 			$(ARCH) $(DEFINES)
 
 CFLAGS	+=	$(INCLUDE) -D__SWITCH__
 
-CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=c++20
+CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=c++20 -ffunction-sections -fdata-sections -flto
 
 ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,--gc-sections,-Map,$(notdir $*.map) -flto
 
 LIBS	:= -lnx
 

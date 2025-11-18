@@ -1,14 +1,15 @@
 #include "panel_main_menu.h"
-#include <tesla.hpp>
+//#include <tesla.hpp>
 #include <switch.h>
 #include <chrono>
 #include "version.h"
 #include "logger.h"
 #include "Command.hpp"
 #include "panel_debug_menu.h"
-#include "panel_setup_menu.h"
+#include "panel_admin_menu.h"
 #include "panel_verifypin.h"
 #include "panel_setup_limits.h"
+#include "panel_history_main.h"
 #include "AppContext.h"
 #include "helpers/ipc_helpers.h"
 
@@ -29,6 +30,10 @@ bool MainMenuPanel::isParentalControlEnabled() {
     return getAppContext().is_enabled;
 }
 
+bool MainMenuPanel::isParentalControlInstalled() {
+    return getAppContext().is_available;
+}
+
 std::list<std::string> MainMenuPanel::getUsersList() {
     std::list<std::string> users;
 
@@ -36,12 +41,12 @@ std::list<std::string> MainMenuPanel::getUsersList() {
 }
 
 tsl::elm::Element* MainMenuPanel::createUI() {
-    std::string subTitle = isParentalControlEnabled() ? "Parental Control is Enabled" : "Parental Control is Disabled";    
+    std::string subTitle = isParentalControlInstalled() ? isParentalControlEnabled() ? "Parental Control is Enabled" : "Parental Control is Disabled" : "Parental Control is not installed";
 
     rootFrame_ = new tsl::elm::OverlayFrame("Parental Control", subTitle);
     rootList_ = new tsl::elm::List();
     
-    rebuildUI();
+    rebuildUI();        
 
     return rootFrame_;
 }
@@ -84,11 +89,42 @@ void MainMenuPanel::rebuildUI() {
         hoursPart = duration_cast<hours>(durationInMinutes);
         minutesPart = duration_cast<minutes>(durationInMinutes - hoursPart);
         auto entryRemainingTime = new tsl::elm::ListItem("Remaining: " +(hoursPart.count() > 0 ? std::to_string(hoursPart.count()) + "h " : "") +std::to_string(minutesPart.count()) +" mn");
-        rootList_->addItem(entryRemainingTime);
-
+        rootList_->addItem(entryRemainingTime);        
     } else {
         rootList_->addItem(new tsl::elm::ListItem("No user / app started"));
     }        
+
+    if(false) { // Disabled
+        const auto& remainingTimeVisibility = ipc::getShowRemainingTime();
+        auto entryShowRemainingTime = new tsl::elm::ToggleListItem("Remaining time visible", remainingTimeVisibility);
+        rootList_->addItem(entryShowRemainingTime);
+        entryShowRemainingTime->setClickListener([this, entryShowRemainingTime](u64 keys) -> bool {
+            if(keys & HidNpadButton_A) {            
+                bool res = ipc::setShowRemainingTime(entryShowRemainingTime->getState());
+                if(!res) {
+                    entryShowRemainingTime->setState(!entryShowRemainingTime->getState());
+                } else {
+                    dirty_ = true;
+                }
+                
+                return true;
+            }
+
+            return false;
+        }); 
+    }
+
+    // History
+    auto entryShowHistory = new tsl::elm::ListItem("Usage history");
+    rootList_->addItem(entryShowHistory);
+    entryShowHistory->setClickListener([this, entryShowHistory](u64 keys) -> bool {
+        if(keys & HidNpadButton_A) {            
+            tsl::changeTo<HistoryMainPanel>();
+            return true;
+        }
+
+        return false;
+    }); 
     
     // Debug menu
     if(getAppContext().is_debug) {
@@ -120,8 +156,7 @@ void MainMenuPanel::rebuildUI() {
     rootFrame_->setContent(rootList_);
 }
 
-void MainMenuPanel::update() {
-    
+void MainMenuPanel::update() {    
 }
 
 // Called once every frame to handle inputs not handled by other UI elements

@@ -1,12 +1,18 @@
 #include "main_overlay.h"
 #include <switch.h>
-#include <tesla.hpp>
 #include "panel_main_menu.h"
+#include "logger.h"
 
 MainOverlay::MainOverlay() {    
 }
 
+extern "C" u64 __nx_vi_layer_id;
+
 std::unique_ptr<tsl::Gui> MainOverlay::loadInitialGui() {
+    logToFile("loadInitialGui. __nx_vi_layer_id=");
+    logIntToFile(__nx_vi_layer_id);
+    logToFile("aruid=");
+    logIntToFile(appletGetAppletResourceUserId());
     return initially<MainMenuPanel>(); 
 }
 

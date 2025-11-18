@@ -1,7 +1,12 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <list>
 #include <switch.h>
+#include <chrono>
+#include "switch_helpers.h"
+
+using namespace alefbet::pctrl::helpers;
 
 namespace alefbet::pctrl::ipc {
     typedef enum {
@@ -9,19 +14,18 @@ namespace alefbet::pctrl::ipc {
         WorkingModeBlocking = 1
     } WorkingMode;
 
-    using UserUid = std::string;
-    using UserNickname = std::string;
     constexpr int UserUidMaxLength = 39;
 
-    void startTest();
+    bool isAvailable();
+
+    void startTest();    
     UserUid getCurrentUserUid();
     UserNickname getCurrentUserNickname();
     std::string getCurrentTitle();
-    u16 getUserUsageTime();
-    u16 getUserRemainingTime();
+    std::chrono::minutes getUserUsageTime(const AccountUid& accountUid = AccountUid{});
+    std::chrono::minutes getUserRemainingTime(const AccountUid& accountUid = AccountUid{});
 
     std::string encodeAdminPin(const std::vector<u64>&);
-    //std::vector<u64> decodeAdminPin(const std::string&);
     bool verifyPin(const std::vector<u64>&);
     bool setupPin(const std::vector<u64>&);
 
@@ -34,5 +38,5 @@ namespace alefbet::pctrl::ipc {
     u16 getDailyLimit();
     bool setDailyLimit(const u16&);
 
-    std::string getVersion();
+    std::string getVersion();    
 }
