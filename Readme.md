@@ -1,7 +1,5 @@
 # NS Parental Control
 
-⚠️ **Warning**: This is a proof of concept under development.
-
 NS Parental Control is a simple parental control system for the Nintendo Switch which does not require Internet access or a smartphone to operate.
 
 It can be used freely.
