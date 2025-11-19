@@ -16,9 +16,9 @@ using json = nlohmann::json;
 using namespace alefbet::pctrl::logger;
 using namespace alefbet::pctrl::helpers;
 
-static const char* DATA_DIR = "/switch/parental_control";
-static const char* DB_FILENAME = "/switch/parental_control/sessions.json";
-static const char* SETTINGS_FILENAME = "/switch/parental_control/settings.json";
+static const char* DATA_DIR = "/config/parental_control";
+static const char* DB_FILENAME = "/config/parental_control/sessions.json";
+static const char* SETTINGS_FILENAME = "/config/parental_control/settings.json";
 
 namespace alefbet::pctrl::database {
     static FsFileSystem sdmc;
@@ -61,6 +61,17 @@ namespace alefbet::pctrl::database {
 
         if(!opened) {
             logToFile("Could not open database file. Try to create a new file.\n");
+
+            // Verify whether data directory exists
+            FsDirEntryType type;
+            if(R_FAILED(fsFsGetEntryType(&sdmc, DATA_DIR, &type))) {
+                // The directory does not exist
+                if(!createDataDirectory()) {
+                    logToFile("[Database] The data directory could not be created.\n");
+                    return history;
+                }
+            }
+
             if(R_FAILED(fsFsCreateFile(&sdmc, DB_FILENAME, 0, 0))) {
                 logToFile("[Database] Could not create a new database file.\n");
                 return history;
@@ -229,6 +240,16 @@ namespace alefbet::pctrl::database {
 
         if(!opened) {
             logToFile("Could not open settings file. Initialise default settings.\n");
+
+            // Verify whether data directory exists
+            FsDirEntryType type;
+            if(R_FAILED(fsFsGetEntryType(&sdmc, DATA_DIR, &type))) {
+                // The directory does not exist
+                if(!createDataDirectory()) {
+                    logToFile("[Database] The data directory could not be created.\n");
+                    return settings;
+                }
+            }
 
             saveSetting(settings, Setting {
                 .key = SETTING_DAILY_LIMIT_GAME,
