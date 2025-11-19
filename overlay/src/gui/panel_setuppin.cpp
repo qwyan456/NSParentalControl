@@ -102,7 +102,6 @@ bool SetupPinPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouchState 
 
         // B to cancel
         if(keysDown & HidNpadButton_B) {
-            //tsl::changeTo<AdminMenuPanel>();
             tsl::goBack();
             return true;
         } 
@@ -110,9 +109,7 @@ bool SetupPinPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouchState 
         return false;
     }
 
-    /*if(currentPin_.size() < (size_t)4) {
-        currentPin_.push_back(keysDown);
-    } else*/ if(newPin_.size() < (size_t)4) {
+    if(newPin_.size() < (size_t)4) {
         newPin_.push_back(keysDown);
     } else if(verifyPin_.size() < (size_t)4) {
         verifyPin_.push_back(keysDown);            
