@@ -41,7 +41,7 @@ namespace alefbet::pctrl::srv {
         while(true) {
             if(!running_) {
                 //Do nothing
-                svcSleepThread(1000*500); // Wait for 500ms
+                svcSleepThread(500'000'000); // Wait for 500ms
                 continue;
             }
             

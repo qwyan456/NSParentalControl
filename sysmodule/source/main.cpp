@@ -16,12 +16,12 @@ using namespace alefbet::pctrl::logger;
 extern "C" {
 #endif
 
-    constexpr size_t TotalHeapSize = ams::util::AlignUp(6_MB, ams::os::MemoryHeapUnitSize);
+    constexpr size_t TotalHeapSize = ams::util::AlignUp(2500_KB, ams::os::MemoryHeapUnitSize);
 
-    constexpr size_t ThreadServiceStackRequiredSizeBytes = ams::util::AlignUp(512_KB, 128);
+    constexpr size_t ThreadServiceStackRequiredSizeBytes = ams::util::AlignUp(256_KB, 128);
     constexpr size_t ThreadServiceStackRequiredSizeAligned = ams::util::AlignUp(ThreadServiceStackRequiredSizeBytes, ams::os::MemoryPageSize);
 
-    constexpr size_t ThreadMonitorStackRequiredSizeBytes = ams::util::AlignUp(256_KB, 128);
+    constexpr size_t ThreadMonitorStackRequiredSizeBytes = ams::util::AlignUp(128_KB, 128);
     constexpr size_t ThreadMonitorStackRequiredSizeAligned = ams::util::AlignUp(ThreadMonitorStackRequiredSizeBytes, ams::os::MemoryPageSize);
     
     alignas(ams::os::MemoryPageSize) constinit u8 g_thread_service_memory[ThreadServiceStackRequiredSizeAligned];
@@ -93,12 +93,9 @@ extern "C" {
     void testMemory() {
         int on_stack = 0;
         int* on_heap = new int(0);
-        logToFile("@on_stack=%p\n", &on_stack);
-        logToFile("@on_heap=%p\n", (void*)on_heap);
 
         extern char* fake_heap_start;
         extern char* fake_heap_end;
-        logToFile("@fake_heap_start=%p, @fake_heap_end=%p, size==%i\n", (void*)fake_heap_start, (void*)fake_heap_end, (uintptr_t)fake_heap_end-(uintptr_t)fake_heap_start);
 
         //Memory allocation test
         /*for(int s = 0x1000 ; s <= 0x150000 ; s += 5000) {
@@ -128,12 +125,8 @@ namespace alefbet::pctrl {
         alefbet::pctrl::srv::Monitor* monitor = static_cast<alefbet::pctrl::srv::Monitor*>(_args[0]);
         alefbet::pctrl::srv::Service* service = static_cast<alefbet::pctrl::srv::Service*>(_args[1]);
 
-        logToFile("@monitor=%p\n", monitor);
-        logToFile("@service=%p\n", service);
-
-        alefbet::pctrl::srv::Monitor* mon = static_cast<alefbet::pctrl::srv::Monitor*>(monitor);
-        mon->setService(service);
-        mon->loop();
+        monitor->setService(service);
+        monitor->loop();
     }
 
 }
