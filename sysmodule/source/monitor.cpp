@@ -45,7 +45,7 @@ namespace alefbet::pctrl::srv {
                 continue;
             }
             
-            logToFile("[Monitor] Monitoring loop has started\n");
+            logToFile("[Monitor] Monitoring loop...\n");
             auto settings = loadSettings();
 
             // Verify whether the service is enabled
@@ -124,6 +124,7 @@ namespace alefbet::pctrl::srv {
                     if(remainingTimeInMinutes <= 0) {
                         logToFile("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
                         //service_->gui().ShowScreenTimeout();
+                        service_->showScreenTimeout();
                     } /*else { // DISABLED
                         logToFile("[Monitor] Remaining time for user %s is %i minutes.\n", user.nickname.c_str(), remainingTimeInMinutes);
                         service_->gui().updateRemainingTimePanel(remainingTimeInMinutes, daily_limit);
