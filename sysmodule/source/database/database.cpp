@@ -297,7 +297,7 @@ namespace alefbet::pctrl::database {
             }
 
             data_settings[fileSize] = '\0';
-            logToFile("[Database] Settings data: %s\n", data_settings);
+            //logToFile("[Database] Settings data: %s\n", data_settings);
             logToFile("[Database] Parse settings file\n");
             json j_settings = json::parse(data_settings);
 

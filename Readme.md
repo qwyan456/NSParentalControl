@@ -177,3 +177,4 @@ https://github.com/switchbrew/switch-examples/tree/master
 - Sean Barrett for STB Truetype
 - @WerWolv for Tesla library
 - @ppkantorski for Ultrahand Overlay
+- @tallbl0nde for IPC Server (from TriPlayer)
