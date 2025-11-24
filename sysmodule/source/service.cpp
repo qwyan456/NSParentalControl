@@ -28,7 +28,7 @@
 #include "database/database.h"
 #include "monitor.h"
 #include "gui/gui_controller.h"
-
+#include "notifications_controller.h"
 //#define PSEC_DEBUG 1
 
 using namespace alefbet::pctrl::logger;
@@ -384,6 +384,7 @@ namespace alefbet::pctrl::srv {
 
         saveSetting(settings, setting);
 
+        // DISABLED temporarily
         /*if(showRemainingTime) {
             gui_.showRemainingTimePanel();
         } else {
@@ -505,10 +506,11 @@ namespace alefbet::pctrl::srv {
                 return getCurrentVersion(request);
             }
             case Ipc::Command::Test: {
-                logToFile("[Service] Schedule timeout screen in 5 seconds...\n");
+                /*logToFile("[Service] Schedule timeout screen in 5 seconds...\n");
                 Thread t;
                 threadCreate(&t, delayedTimeout, this, NULL, 0x4000, 0x2c, -2);
-                threadStart(&t);
+                threadStart(&t);*/                
+                NotificationsController::notifyRemainingTime(15);
 
                 break;
             }

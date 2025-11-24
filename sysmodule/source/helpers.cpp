@@ -194,6 +194,9 @@ namespace alefbet::pctrl::helpers {
 
         NacpLanguageEntry* langEntry = nullptr;
         rc = nacpGetLanguageEntry(&control.nacp, &langEntry);
+        if(R_FAILED(rc) || langEntry == nullptr) {
+            return "Unknown";
+        }
 
         return std::string(langEntry->name);
     }

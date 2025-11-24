@@ -6,7 +6,7 @@ It can be used freely.
 
 ## Current version
 
-1.1.0
+[1.2](https://github.com/TristanIsrael/NSParentalControl/releases/latest)
 
 ## Table of Contents
 
@@ -33,10 +33,13 @@ Parental control has the following features:
 - Check the played time
 - Check the remaining play time
 - When the time is out, the system is blocked
+- Notified every 15 minutes and every minute in the last 5 minutes
+- Get usage history
 
 **Administrator** (protected by a PIN code)
 - Define a PIN to protect setup access - *default PIN is A A A A*
 - Enable or disable the parental control
+- Enable or disable the notifications
 
 ## Coming features
 
@@ -59,7 +62,7 @@ Coming features are in the [GitHub project](https://github.com/users/TristanIsra
 ![Parental control limits setting](docs/2025102321565700.jpg)
 **Parental control limits settings**
 
-![Time out](pctrl/misc/timeout.png)
+![Time out](docs/timeout.png)
 **Timeout screen**
 
 ## Licence
@@ -88,7 +91,9 @@ Libraries linked or code reused:
 
 ## Installation
 
-1. Install the required [**Tesla Menu**](https://switch.hacks.guide/homebrew/tesla-menu.html) or [**Ultrahand Overlay**](https://github.com/ppkantorski/Ultrahand-Overlay)
+1. Install the required [**Tesla Menu**](https://switch.hacks.guide/homebrew/tesla-menu.html) or [**Ultrahand Overlay**](https://github.com/ppkantorski/Ultrahand-Overlay).
+
+⚠️ If you want notifications you have to install **[Ultrahand Overlay](https://github.com/ppkantorski/Ultrahand-Overlay)**. Please look at its documentation to know how to install it and how to enable the notifications.
 
 2. Download the latest release from [GitHub](https://github.com/TristanIsrael/NSParentalControl/releases/tag/1.1).
 
@@ -98,7 +103,7 @@ Here are the files and their destination:
 |--|--|--|
 | exefs.nsp | /atmosphere/contents/420000000003103 | The core of the system as a *sysmodule* |
 | toolbox.json | /atmosphere/contents/420000000003103 | A description file for Atmosphère |
-| boot2.flag | /atmosphere/contents/420000000003103/flags | Needed file to make the sysmodule start at boot |
+| boot2.flag | /atmosphere/contents/420000000003103/flags | Mandatory file to make the sysmodule start at boot |
 | parental_control.ovl | /switch/.overlays | The overlay |
 
 After copying the files, reboot the console.
@@ -164,7 +169,7 @@ Copy this file in the directory `/switch/.overlays/` in the SD card of the Switc
 
 In order for the parental control to load on startup you have to create a new folder named `flags` into `/atmosphere/contents/420000000003103`. 
 
-In this folder create an empty file named `boot2.flag`
+In this folder create an empty file named `boot2.flag`.
 
 ## References
 
@@ -172,8 +177,8 @@ https://github.com/switchbrew/switch-examples/tree/master
 
 ## Credits
 
-- Niels Lohmann <https://nlohmann.me> for JSON C++ library
-- @SciresM for Atmosphère
-- Sean Barrett for STB Truetype
-- @WerWolv for Tesla library
-- @ppkantorski for Ultrahand Overlay
+- Niels Lohmann <https://nlohmann.me> for JSON C++ library.
+- @SciresM for Atmosphère.
+- Sean Barrett for STB Truetype library.
+- @WerWolv for [Tesla library](https://github.com/WerWolv/libtesla).
+- @ppkantorski for [Ultrahand Overlay](https://github.com/ppkantorski/Ultrahand-Overlay).

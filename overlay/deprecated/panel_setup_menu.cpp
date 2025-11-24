@@ -77,6 +77,21 @@ void SetupMenuPanel::rebuildUI() {
         return false;
     });
 
+    const auto& remainingTimeVisibility = ipc::getShowRemainingTime();
+    auto entryShowRemainingTime = new tsl::elm::ToggleListItem("Notify remaining time", remainingTimeVisibility);
+    rootList_->addItem(entryShowRemainingTime);
+    entryShowRemainingTime->setClickListener([entryShowRemainingTime](u64 keys) -> bool {
+        if(keys & HidNpadButton_A) {            
+            bool res = ipc::setShowRemainingTime(entryShowRemainingTime->getState());
+            if(!res) {
+                entryShowRemainingTime->setState(!entryShowRemainingTime->getState());
+            }
+            return true;
+        }
+
+        return false;
+    });
+
     // Setup limits
     auto entryLimits = new tsl::elm::ListItem("Setup limits");
     rootList_->addItem(entryLimits);
@@ -93,23 +108,6 @@ void SetupMenuPanel::rebuildUI() {
     rootList_->addItem(new tsl::elm::ListItem("Overlay", VERSION));
     rootList_->addItem(new tsl::elm::ListItem("Sysmodule", ipc::getVersion()));    
 
-    /*const auto& remainingTimeVisibility = ipc::getShowRemainingTime();
-    auto entryShowRemainingTime = new tsl::elm::ToggleListItem("Remaining time visible", remainingTimeVisibility);
-    rootList_->addItem(entryShowRemainingTime);
-    entryShowRemainingTime->setClickListener([entryShowRemainingTime](u64 keys) -> bool {
-        if(keys & HidNpadButton_A) {            
-            bool res = ipc::setShowRemainingTime(entryShowRemainingTime->getState());
-            if(!res) {
-                entryShowRemainingTime->setState(!entryShowRemainingTime->getState());
-            }
-            return true;
-        }
-
-        return false;
-    });*/
-
-    // Show remaining time
-    
 
     // Setup global limit
     /*auto entrySetPin = new tsl::elm::("Set PIN");
