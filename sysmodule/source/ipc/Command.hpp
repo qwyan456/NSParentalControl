@@ -23,7 +23,9 @@ namespace Ipc {
         IsEnabled,                  /*! Returns the current state of the parental control service. Returns 1 if the service is enabled. */
         SetEnabled,                 /*! Sets the state of the parental control service. 1 to enable the service. 0 to disable. */
         GetDailyLimit,              /*! Returns the current setting of the daily limit in minutes. */
-        SetDailyLimit               /*! Sets the daily limit in minutes. */
+        SetDailyLimit,              /*! Sets the daily limit in minutes. */
+        SetLogLevel,                /*! Sets the log level */
+        GetLogLevel                 /*! Returns the current log level */
     };
 
 
@@ -49,6 +51,8 @@ namespace Ipc {
             case Command::SetEnabled: return "SetEnabled";
             case Command::GetDailyLimit: return "GetDailyLimit";
             case Command::SetDailyLimit: return "SetDailyLimit";
+            case Command::SetLogLevel: return "SetLogLevel";
+            case Command::GetLogLevel: return "GetLogLevel";
             default: return "Unknown";
         }
     };

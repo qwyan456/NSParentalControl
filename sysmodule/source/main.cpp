@@ -5,12 +5,14 @@
 #include <unistd.h>
 #include <chrono>
 #include "logger.h"
+#include "database/database.h"
 #include "utils.h"
 #include "ipc/Server.hpp"
 #include "service.hpp"
 #include "monitor.h"
 
 using namespace alefbet::pctrl::logger;
+using namespace alefbet::pctrl::database;
 
 #ifdef __cplusplus
 extern "C" {
@@ -101,10 +103,10 @@ extern "C" {
         /*for(int s = 0x1000 ; s <= 0x150000 ; s += 5000) {
             void* ptr = aligned_alloc(0x1000, s);
             if(ptr != nullptr) {
-                logToFile("Allocation of %i bytes succeeded. @ptr=%p\n", s, (void*)ptr);
+                logDebug("Allocation of %i bytes succeeded. @ptr=%p\n", s, (void*)ptr);
                 free(ptr);
             } else {
-                logToFile("Allocation of %i bytes failed\n", s);    
+                logDebug("Allocation of %i bytes failed\n", s);    
                 break;                                            
             }            
         } */
@@ -137,7 +139,13 @@ int main(int argc, char **argv)
         exit(1);
 
     clearLog();
-    logToFile("[Main] Parental control starting\n");
+    auto settings = loadSettings();
+    if(settings.contains(SETTING_LOGLEVEL)) {
+        const auto& logLevel = settings[SETTING_LOGLEVEL].int_value;
+        setLogLevel(static_cast<LogLevel>(logLevel));
+    }
+
+    logInfo("[Main] Parental control starting\n");
 
     //testMemory();
 
@@ -150,12 +158,12 @@ int main(int argc, char **argv)
     Thread threadIpc;
     rc = threadCreate(&threadIpc, alefbet::pctrl::startIpc, service, g_thread_service_memory, ThreadServiceStackRequiredSizeAligned, 0x2c, -2);               
     if(R_FAILED(rc)) {
-        logToFile("Could not create the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
+        logError("Could not create the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
         return 2;
     }
     rc = threadStart(&threadIpc);
     if(R_FAILED(rc)) {
-        logToFile("Could not start the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
+        logError("Could not start the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
         return 3;
     }
         
@@ -164,12 +172,12 @@ int main(int argc, char **argv)
     void* monitorArgs[2] { monitor, service };
     rc = threadCreate(&threadMonitor, alefbet::pctrl::startMonitor, &monitorArgs, g_thread_monitor_memory, ThreadMonitorStackRequiredSizeAligned, 0x2c, -2);
     if(R_FAILED(rc)) {
-        logToFile("Could not create the monitor thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
+        logError("Could not create the monitor thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
         return 4;
     }
     rc = threadStart(&threadMonitor); // Run the monitor's loop
     if(R_FAILED(rc)) {
-        logToFile("Could not start the monitor thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
+        logError("Could not start the monitor thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
         return 5;
     }
 
@@ -178,20 +186,20 @@ int main(int argc, char **argv)
 
     rc = threadWaitForExit(&threadIpc);
     if(R_FAILED(rc)) {
-        logToFile("Could not wait for the service thread to end, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
+        logError("Could not wait for the service thread to end, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
         return 6;
     }
 
     rc = threadWaitForExit(&threadMonitor);
     if(R_FAILED(rc)) {
-        logToFile("Could not wait for the monitor thread to end, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
+        logError("Could not wait for the monitor thread to end, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
         return 7;
     }
 
     delete monitor;
     delete service;
 
-    logToFile("Parental control ended\n");
+    logInfo("Parental control ended\n");
 
     return 0;
 }

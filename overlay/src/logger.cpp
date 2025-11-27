@@ -2,17 +2,16 @@
 #include <mutex>
 #include <cstring>
 #include <cassert>
-#include "literals.h"
-#include "utils.h"
+#include <switch.h>
 
-constexpr const char* LogFilename = "/atmosphere/logs/pctrl_svc.log";
+constexpr const char* LogFilename = "/switch/pctrl_ovl.log";
 
 namespace alefbet {
     namespace pctrl {
 
         namespace {
             static std::mutex s_mutex;                
-            static constinit char g_format_buffer[2 * ams::os::MemoryPageSize];
+            static constinit char g_format_buffer[2 * 4 * 1024];
             static FsFileSystem sdmc;
             static bool ready = false;
             static FsFile handle;

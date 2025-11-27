@@ -14,7 +14,7 @@ static FsFileSystem sdmc;
 void UltraHandInterface::writeNotification(const std::string& message, int fontSize, int priority) 
 {    
     if(!R_SUCCEEDED(fsOpenSdCardFileSystem(&sdmc))) {
-        logToFile("[Ultrahand] Could not open SD Card\n");
+        logError("[Ultrahand] Could not open SD Card\n");
         return;
     }
 
@@ -24,7 +24,7 @@ void UltraHandInterface::writeNotification(const std::string& message, int fontS
 
     if (R_FAILED(fsFsGetEntryType(&sdmc, FLAGPATH, &fileType))) {
         // Flag file does not exist, do nothing
-        logToFile("[Ultrahand] Notifications are not enabled in Ultrahand\n");
+        logInfo("[Ultrahand] Notifications are not enabled in Ultrahand\n");
         return;
     }
 
@@ -34,7 +34,7 @@ void UltraHandInterface::writeNotification(const std::string& message, int fontS
     std::string fullPath = "/config/ultrahand/notifications/" + filename;
 
     if(R_FAILED(fsFsCreateFile(&sdmc, fullPath.c_str(), 0, 0))) {
-        logToFile("[Ultrahand] Could not create notification file\n");
+        logError("[Ultrahand] Could not create notification file\n");
         return;
     }
 
@@ -48,13 +48,15 @@ void UltraHandInterface::writeNotification(const std::string& message, int fontS
         const auto s_data = notif.c_str();
 
         if(R_SUCCEEDED(fsFileWrite(&handle, 0, s_data, std::strlen(s_data), FsWriteOption_Flush))) {
-            logToFile("[Ultrahand] Notification file has been written\n");
+            logDebug("[Ultrahand] Notification file has been written\n");
         } else {
-            logToFile("[Ultrahand] Notification file has not been written\n");
+            logError("[Ultrahand] Notification file has not been written\n");
         }
 
         fsFileClose(&handle);
     }
+
+    fsFsClose(&sdmc);
 }
 
 /*! \brief Shows a short notification to draw users attention */

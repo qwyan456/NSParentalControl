@@ -33,10 +33,16 @@ namespace alefbet::pctrl::database {
 
         ready = R_SUCCEEDED(fsOpenSdCardFileSystem(&sdmc));
         if(!ready) {
-            logToFile("[Database] Could not get access to SD card\n");
+            logError("[Database] Could not get access to SD card\n");
         }
 
         return ready;
+    }
+
+    void freeFs() {
+        if(!ready) return;
+
+        fsFsClose(&sdmc);
     }
 
     bool createDataDirectory() 
@@ -52,7 +58,7 @@ namespace alefbet::pctrl::database {
     {            
         std::lock_guard<std::mutex> lock(mutex_database);
 
-        logToFile("[Database] Loading database at %s\n", DB_FILENAME);
+        logDebug("[Database] Loading database at %s\n", DB_FILENAME);
 
         if(!prepare()) return History{};
 
@@ -60,59 +66,59 @@ namespace alefbet::pctrl::database {
         History history;
 
         if(!opened) {
-            logToFile("Could not open database file. Try to create a new file.\n");
+            logError("Could not open database file. Try to create a new file.\n");
 
             // Verify whether data directory exists
             FsDirEntryType type;
             if(R_FAILED(fsFsGetEntryType(&sdmc, DATA_DIR, &type))) {
                 // The directory does not exist
                 if(!createDataDirectory()) {
-                    logToFile("[Database] The data directory could not be created.\n");
+                    logError("[Database] The data directory could not be created.\n");
                     return history;
                 }
             }
 
             if(R_FAILED(fsFsCreateFile(&sdmc, DB_FILENAME, 0, 0))) {
-                logToFile("[Database] Could not create a new database file.\n");
+                logError("[Database] Could not create a new database file.\n");
                 return history;
             }
         } else {
             s64 fileSize = 0;
             if(R_FAILED(fsFileGetSize(&handle_database, &fileSize))) {
-                logToFile("[Database] Could not get database file size\n");
+                logError("[Database] Could not get database file size\n");
                 fsFileClose(&handle_database);
                 return history;
             } else {
-                logToFile("[Database] Database file size is %i\n", fileSize);
+                logDebug("[Database] Database file size is %i\n", fileSize);
             }
 
             if(fileSize == 0) {
-                logToFile("[Database] Database file is empty\n");
+                logError("[Database] Database file is empty\n");
                 fsFileClose(&handle_database);
                 return history;
             }
 
             u8* data_sessions = new u8[fileSize+1];            
             if(data_sessions == nullptr) {
-                logToFile("[Database] Could not create a buffer for sessions\n");
+                logError("[Database] Could not create a buffer for sessions\n");
                 fsFileClose(&handle_database);
                 return history;
             } else {
-                logToFile("[Database] sessions buffer ready at @%p\n", (void*)data_sessions);
+                logDebug("[Database] sessions buffer ready at @%p\n", (void*)data_sessions);
             }
 
             u64 dataRead = 0;
             if(R_FAILED(fsFileRead(&handle_database, 0, data_sessions, fileSize, FsReadOption_None, &dataRead))) {
-                logToFile("[Database] Could not read the database file\n");
+                logError("[Database] Could not read the database file\n");
                 fsFileClose(&handle_database);
                 return history;
             } else {
-                logToFile("[Database] Sessions database read\n");
+                logDebug("[Database] Sessions database read\n");
             }
 
             data_sessions[fileSize] = '\0';
-            logToFile("[Database] Sessions data: %s\n", data_sessions);
-            logToFile("[Database] Parse sessions file\n");
+            logDebug("[Database] Sessions data: %s\n", data_sessions);
+            logDebug("[Database] Parse sessions file\n");
             json j_settings = json::parse(data_sessions);
 
             std::vector<json> j_entries = j_settings["history"].get<std::vector<json>>();
@@ -157,27 +163,27 @@ namespace alefbet::pctrl::database {
         };
 
         if(R_FAILED(fsFsDeleteFile(&sdmc, DB_FILENAME))) {
-            logToFile("[Database] Could not delete the current database file\n");            
+            logError("[Database] Could not delete the current database file\n");            
         }
 
         if(R_FAILED(fsFsCreateFile(&sdmc, DB_FILENAME, 0, 0))) {
-            logToFile("[Database] Could not create the database file\n");
+            logError("[Database] Could not create the database file\n");
             return;
         } else {
-            logToFile("[Database] New database file created\n");
+            logInfo("[Database] New database file created\n");
         }
 
         if(R_FAILED(fsFsOpenFile(&sdmc, DB_FILENAME, FsOpenMode_Write | FsOpenMode_Append, &handle_database))) {
-            logToFile("[Database] The database file could not be opened for writing\n");
+            logError("[Database] The database file could not be opened for writing\n");
             return;
         }
 
         const auto data = j_history.dump();
         const auto s_data = data.c_str();
 
-        logToFile("[Database] Writing sessions data %s (size=%i)\n", s_data, std::strlen(s_data));    
+        logDebug("[Database] Writing sessions data %s (size=%i)\n", s_data, std::strlen(s_data));    
         if(R_FAILED(fsFileWrite(&handle_database, 0, s_data, std::strlen(s_data), FsWriteOption_Flush))) {
-            logToFile("[Database] Could not write into database file\n");
+            logError("[Database] Could not write into database file\n");
         }
 
         fsFileClose(&handle_database);
@@ -195,7 +201,7 @@ namespace alefbet::pctrl::database {
         HistoryEntry result;
 
         if(uid.uid[0] == 0 || uid.uid[1] == 0 || titleId == 0) {
-            logToFile("[Database] Wrong parameters\n");
+            logError("[Database] Wrong parameters\n");
             return result;
         }
 
@@ -214,13 +220,13 @@ namespace alefbet::pctrl::database {
 
         if(!entries.empty()) {
             auto entry = entries[0];
-            logToFile("[Database] entry found for user %s with title ID %i\n", uidToString.c_str(), titleId);
+            logDebug("[Database] entry found for user %s with title ID %i\n", uidToString.c_str(), titleId);
             entry.setDurationInMinutes(duration_in_minutes + entry.durationInMinutes());
-            logToFile("[Database] new duration is %i\n", entry.durationInMinutes());
+            logDebug("[Database] new duration is %i\n", entry.durationInMinutes());
             result = entry;
         } else {
             //Or create a new one
-            logToFile("[Database] no entry found for user %s with title ID %i\n", uidToString.c_str(), titleId);
+            logDebug("[Database] no entry found for user %s with title ID %i\n", uidToString.c_str(), titleId);
             HistoryEntry entry = HistoryEntry(uid, date, titleId, duration_in_minutes);
             history.addEntry(entry);
             result = entry;
@@ -231,7 +237,7 @@ namespace alefbet::pctrl::database {
     }
 
     Settings loadSettings() {
-        logToFile("[Database] Loading settings at %s\n", SETTINGS_FILENAME);
+        logDebug("[Database] Loading settings at %s\n", SETTINGS_FILENAME);
 
         if(!prepare()) return Settings{};
 
@@ -239,14 +245,14 @@ namespace alefbet::pctrl::database {
         Settings settings;
 
         if(!opened) {
-            logToFile("Could not open settings file. Initialise default settings.\n");
+            logError("Could not open settings file. Initialise default settings.\n");
 
             // Verify whether data directory exists
             FsDirEntryType type;
             if(R_FAILED(fsFsGetEntryType(&sdmc, DATA_DIR, &type))) {
                 // The directory does not exist
                 if(!createDataDirectory()) {
-                    logToFile("[Database] The data directory could not be created.\n");
+                    logError("[Database] The data directory could not be created.\n");
                     return settings;
                 }
             }
@@ -265,40 +271,40 @@ namespace alefbet::pctrl::database {
         } else {
             s64 fileSize = 0;
             if(R_FAILED(fsFileGetSize(&handle_settings, &fileSize))) {
-                logToFile("[Database] Could not get settings file size\n");
+                logError("[Database] Could not get settings file size\n");
                 fsFileClose(&handle_settings);
                 return settings;
             } else {
-                logToFile("[Database] Settings file size is %i\n", fileSize);
+                logDebug("[Database] Settings file size is %i\n", fileSize);
             }
 
             if(fileSize == 0) {
-                logToFile("[Database] Settings file is empty\n");
+                logError("[Database] Settings file is empty\n");
                 fsFileClose(&handle_settings);
                 return settings;
             }
 
             u8* data_settings = new u8[fileSize+1];            
             if(data_settings == nullptr) {
-                logToFile("[Database] Could not create a buffer for settings\n");
+                logError("[Database] Could not create a buffer for settings\n");
                 fsFileClose(&handle_settings);
                 return settings;
             } else {
-                logToFile("[Database] settings buffer ready at @%p\n", (void*)data_settings);
+                logDebug("[Database] settings buffer ready at @%p\n", (void*)data_settings);
             }
 
             u64 dataRead = 0;
             if(R_FAILED(fsFileRead(&handle_settings, 0, data_settings, fileSize, FsReadOption_None, &dataRead))) {
-                logToFile("[Database] Could not read the settings file\n");
+                logError("[Database] Could not read the settings file\n");
                 fsFileClose(&handle_settings);
                 return settings;
             } else {
-                logToFile("[Database] Settings database read\n");
+                logDebug("[Database] Settings database read\n");
             }
 
             data_settings[fileSize] = '\0';
-            logToFile("[Database] Settings data: %s\n", data_settings);
-            logToFile("[Database] Parse settings file\n");
+            logDebug("[Database] Settings data: %s\n", data_settings);
+            logDebug("[Database] Parse settings file\n");
             json j_settings = json::parse(data_settings);
 
             if(j_settings.contains("settings")) {
@@ -317,7 +323,7 @@ namespace alefbet::pctrl::database {
 
                         settings[setting.key] = setting;
                     } else {
-                        logToFile("[Database] setting is malformed\n");
+                        logError("[Database] setting is malformed\n");
                     }
                 }
             }
@@ -336,7 +342,7 @@ namespace alefbet::pctrl::database {
     }
     
     void saveSettings(Settings& settings) {
-        logToFile("[Database] Saving settings\n");
+        logDebug("[Database] Saving settings\n");
         std::lock_guard<std::mutex> lock(mutex_settings);        
 
         if(!prepare()) return;
@@ -367,31 +373,31 @@ namespace alefbet::pctrl::database {
 
    
         if(R_FAILED(fsFsDeleteFile(&sdmc, SETTINGS_FILENAME))) {
-            logToFile("[Database] Could not delete the settings file\n"); //Error 514?            
+            logError("[Database] Could not delete the settings file\n"); //Error 514?            
         } else {
-            logToFile("[Database] Successfully removed current settings\n");
+            logDebug("[Database] Successfully removed current settings\n");
         }
 
         if(R_FAILED(fsFsCreateFile(&sdmc, SETTINGS_FILENAME, 0, 0))) {
-            logToFile("[Database] Could not create the settings file\n");
+            logError("[Database] Could not create the settings file\n");
             return;
         } else {
-            logToFile("[Database] New settings file created\n");
+            logDebug("[Database] New settings file created\n");
         }
 
         if(R_FAILED(fsFsOpenFile(&sdmc, SETTINGS_FILENAME, FsOpenMode_Write | FsOpenMode_Append, &handle_settings))) {
-            logToFile("[Database] The settings file could not be opened for writing\n");
+            logError("[Database] The settings file could not be opened for writing\n");
             return;
         } else {
-            logToFile("[Database] Settings file successfully opened\n");
+            logDebug("[Database] Settings file successfully opened\n");
         }
 
         const auto data = j_settings.dump();
         const auto s_data = data.c_str();
-        logToFile("[Database] Writing settings %s (size=%i)\n", s_data, std::strlen(s_data));
+        logDebug("[Database] Writing settings %s (size=%i)\n", s_data, std::strlen(s_data));
 
         if(R_FAILED(fsFileWrite(&handle_settings, 0, s_data, std::strlen(s_data), FsWriteOption_Flush))) {
-            logToFile("[Database] Could not write into settings file\n");
+            logError("[Database] Could not write into settings file\n");
         }
 
         fsFileClose(&handle_settings);

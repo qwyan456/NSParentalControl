@@ -13,6 +13,12 @@ namespace alefbet::pctrl::ipc {
         WorkingModeInfo = 0,
         WorkingModeBlocking = 1
     } WorkingMode;
+    
+    typedef enum {
+        DEBUG = 0,                
+        INFO = 5,
+        ERROR = 10
+    } LogLevel;
 
     constexpr int UserUidMaxLength = 39;
 
@@ -37,6 +43,8 @@ namespace alefbet::pctrl::ipc {
     bool setEnabled(const bool&);
     u16 getDailyLimit();
     bool setDailyLimit(const u16&);
+    bool isDebugLogEnabled();
+    bool enableDebugLog(bool enable);
 
     std::string getVersion();    
 }

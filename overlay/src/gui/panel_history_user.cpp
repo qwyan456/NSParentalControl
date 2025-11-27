@@ -9,6 +9,7 @@
 #include "helpers/ipc_helpers.h"
 
 using namespace alefbet::pctrl;
+using namespace alefbet::pctrl::logger;
 using namespace std::chrono;
 
 HistoryUserPanel::HistoryUserPanel(const UserData& user) {    
@@ -35,9 +36,7 @@ void HistoryUserPanel::rebuildUI() {
     duration today_remaining = ipc::getUserRemainingTime(user_.uid);
     hours today_remaining_h = duration_cast<hours>(today_remaining);
 
-    logToFile("Usages");
-    logIntToFile(today_usage.count());
-    logIntToFile(today_remaining.count());
+    logDebug("Usage: %i, remaining:%i\n", today_usage.count(), today_remaining.count());
 
     std::string strUsage = std::to_string(today_usage_h.count()) +"h " +std::to_string( (today_usage - today_usage_h).count() ) +"mn";
     std::string strRemaining = std::to_string(today_remaining_h.count()) +"h " +std::to_string( (today_remaining - today_remaining_h).count() ) +"mn";

@@ -243,7 +243,7 @@ namespace alefbet::pctrl::font {
     Result InitializeSharedFont() {
         ::Result rc = plGetSharedFontByType(std::addressof(g_font), PlSharedFontType_Standard);
         if(rc != 0) {
-            logToFile("[Font] font initialization failed\n");
+            logError("[Font] font initialization failed\n");
         }
 
         u8 *font_buffer = reinterpret_cast<u8 *>(g_font.address);

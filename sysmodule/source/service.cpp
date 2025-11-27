@@ -42,11 +42,11 @@ namespace alefbet::pctrl::srv {
 
     Service::Service(Ipc::Server* ipcServer)
     : ipcServer_(ipcServer) {
-        logToFile("[Service] Starting service\n");        
+        logInfo("[Service] Starting service\n");        
         ipcServer_->setRequestHandler([this](Ipc::Request * r) -> uint32_t {
             return static_cast<uint32_t>(this->commandThread(r));
         });
-        logToFile("[Service] service started\n");
+        logInfo("[Service] service started\n");
         
         /* Verify whether the service is enabled */
         auto settings = loadSettings();
@@ -68,7 +68,7 @@ namespace alefbet::pctrl::srv {
     }
 
     void Service::showScreenTimeout() {        
-        logToFile("[Service] Requested to show timeout screen\n");                        
+        logDebug("[Service] Requested to show timeout screen\n");                        
 
         gui_.showScreenTimeout();
 
@@ -83,7 +83,7 @@ namespace alefbet::pctrl::srv {
             gpioPadGetValue(&g_volup, &value);
 
             if(value == 0) {
-                logToFile("[GUI] Vol+ pressed.\n");
+                logDebug("[GUI] Vol+ pressed.\n");
                 actions::reboot_to_payload();
                 break;
             }  
@@ -136,10 +136,10 @@ namespace alefbet::pctrl::srv {
 
         const auto current_user = helpers::getCurrentUser();
         if(current_user.isValid()) {
-            logToFile("[Service] replying UID=%s\n", current_user.nickname.c_str());
+            logDebug("[Service] replying UID=%s\n", current_user.nickname.c_str());
             request->appendReplyValue(current_user.nickname);
         } else {
-            logToFile("[Service] replying UID=(NULL)\n");
+            logDebug("[Service] replying UID=(NULL)\n");
             request->appendReplyValue(NullString);
         }
 
@@ -147,7 +147,7 @@ namespace alefbet::pctrl::srv {
     }
 
     Ipc::Result Service::getUsersList(Ipc::Request* request) {
-        logToFile("[Service] WARNING! GetUsersList command is deprecated\n");
+        logError("[Service] WARNING! GetUsersList command is deprecated\n");
         return Ipc::Result::Ok;
     }
 
@@ -157,21 +157,21 @@ namespace alefbet::pctrl::srv {
 
         Ipc::Result rc = request->readRequestValue(user_uid);
         if(rc != Ipc::Result::Ok) {
-            logToFile("[Service] No user uid sent, using current user\n");
+            logDebug("[Service] No user uid sent, using current user\n");
 
             user = helpers::getCurrentUser();
             if(!user.isValid()) {
-                logToFile("[Service] There is no user\n");
+                logDebug("[Service] There is no user\n");
                 return Ipc::Result::Ok;
             }
         } else {
             // Get the user from the uid sent
-            logToFile("[Service] user Uid received: %s\n", user_uid);
+            logDebug("[Service] user Uid received: %s\n", user_uid);
             const auto& account_uid = accountUidFromString(UserUid(user_uid));
             user = getUserFromAccountUid(account_uid);
         }
 
-        logToFile("[Service] Get usage time for user %s\n", user.nickname.c_str());
+        logDebug("[Service] Get usage time for user %s\n", user.nickname.c_str());
 
         const auto& date = today();
         if(date.empty()) {
@@ -194,7 +194,7 @@ namespace alefbet::pctrl::srv {
             remaining_time_in_minutes = daily_limit - usage_time_in_minutes;
         }
 
-        logToFile("[Service] User=%s, usage=%i minutes, remaining=%i minutes\n", user.nickname.c_str(), usage_time_in_minutes, remaining_time_in_minutes);
+        logDebug("[Service] User=%s, usage=%i minutes, remaining=%i minutes\n", user.nickname.c_str(), usage_time_in_minutes, remaining_time_in_minutes);
 
         request->appendReplyValue(remaining_time_in_minutes);
 
@@ -207,21 +207,21 @@ namespace alefbet::pctrl::srv {
 
         Ipc::Result rc = request->readRequestValue(user_uid);
         if(rc != Ipc::Result::Ok) {
-            logToFile("[Service] No user uid sent, using current user\n");
+            logDebug("[Service] No user uid sent, using current user\n");
 
             user = helpers::getCurrentUser();
             if(!user.isValid()) {
-                logToFile("[Service] There is no user\n");
+                logDebug("[Service] There is no user\n");
                 return Ipc::Result::Ok;
             }
         } else {
             // Get the user from the uid sent
-            logToFile("[Service] user Uid received: %s\n", user_uid);
+            logDebug("[Service] user Uid received: %s\n", user_uid);
             const auto& account_uid = accountUidFromString(UserUid(user_uid));
             user = getUserFromAccountUid(account_uid);
         }
 
-        logToFile("[Service] Get usage time for user %s\n", user.nickname.c_str());
+        logDebug("[Service] Get usage time for user %s\n", user.nickname.c_str());
 
         const auto history = getHistory(user.uid, today());
         auto usage_time_in_minutes = (u16)0;        
@@ -231,7 +231,7 @@ namespace alefbet::pctrl::srv {
             usage_time_in_minutes += entry.durationInMinutes();
         }
 
-        logToFile("[Service] User=%s, usage=%i minutes\n", user.nickname.c_str(), usage_time_in_minutes);
+        logDebug("[Service] User=%s, usage=%i minutes\n", user.nickname.c_str(), usage_time_in_minutes);
 
         request->appendReplyValue(usage_time_in_minutes);
 
@@ -243,7 +243,7 @@ namespace alefbet::pctrl::srv {
         u16 limit_in_minutes;
         Ipc::Result rc = request->readRequestData(limit_in_minutes);
         if(rc != Ipc::Result::Ok) {
-            logToFile("[Service] Could not read request data (limit)\n");
+            logError("[Service] Could not read request data (limit)\n");
             return rc;
         }
 
@@ -277,13 +277,13 @@ namespace alefbet::pctrl::srv {
         }
 
         if(rc != Ipc::Result::Ok) {
-            logToFile("[Service] Could not read request data (PIN)\n");
+            logDebug("[Service] Could not read request data (PIN)\n");
             return rc;
         }
 
         std::string s_pin = std::to_string(pin[0]) +"," +std::to_string(pin[1]) +"," +std::to_string(pin[2]) +"," +std::to_string(pin[3]);
 
-        logToFile("[Service] Setting admin PIN to %s", pin);
+        logDebug("[Service] Setting admin PIN to %s", pin);
         auto settings = loadSettings();
         
         Setting settingPin {
@@ -313,7 +313,7 @@ namespace alefbet::pctrl::srv {
         }
 
         if(rc != Ipc::Result::Ok) {
-            logToFile("[Service] Could not read request data (PIN)\n");
+            logError("[Service] Could not read request data (PIN)\n");
             return Ipc::Result::BadInput;
         }
 
@@ -324,9 +324,9 @@ namespace alefbet::pctrl::srv {
         auto adminPin = settings[SETTING_ADMIN_PIN].string_value;
         if(adminPin.empty()) {
             adminPin = std::to_string(DefaultPin[0]) +"," +std::to_string(DefaultPin[1]) +"," +std::to_string(DefaultPin[2]) +"," +std::to_string(DefaultPin[3]);
-            logToFile("[Service] No PIN defined. Using default.\n");
+            logDebug("[Service] No PIN defined. Using default.\n");
         }
-        logToFile("[Service] verify admin PIN. Recv=%s. ref=%s\n", s_pin.c_str(), adminPin.c_str());
+        logDebug("[Service] verify admin PIN. Recv=%s. ref=%s\n", s_pin.c_str(), adminPin.c_str());
         request->appendReplyValue(adminPin == s_pin ? true : false);
 
         return Ipc::Result::Ok;
@@ -337,7 +337,7 @@ namespace alefbet::pctrl::srv {
         WorkingMode workingMode = WorkingModeInfo;
         Ipc::Result rc = request->readRequestValue(workingMode);
         if(rc != Ipc::Result::Ok) {
-            logToFile("[Service] Could not read request data (working mode)\n");
+            logError("[Service] Could not read request data (working mode)\n");
             return Ipc::Result::BadInput;
         }
 
@@ -357,7 +357,7 @@ namespace alefbet::pctrl::srv {
         auto settings = loadSettings();
 
         if(!settings.contains(SETTING_WORKING_MODE)) {
-            logToFile("[Service] The setting %s is not defined.\n", SETTING_WORKING_MODE);
+            logDebug("[Service] The setting %s is not defined.\n", SETTING_WORKING_MODE);
             request->appendReplyValue((u8)WorkingModeBlocking);
         } else {
             request->appendReplyValue((u8)settings[SETTING_WORKING_MODE].int_value);
@@ -369,9 +369,9 @@ namespace alefbet::pctrl::srv {
     Ipc::Result Service::setShowRemainingTime(Ipc::Request* request) {        
         bool showRemainingTime = false;
         Ipc::Result rc = request->readRequestValue(showRemainingTime);
-        logToFile("[Service] Show remaining time panel ? %i\n", showRemainingTime);        
+        logDebug("[Service] Show remaining time panel ? %i\n", showRemainingTime);        
         if(rc != Ipc::Result::Ok) {
-            logToFile("[Service] Could not read data (set show remaining time)\n");
+            logError("[Service] Could not read data (set show remaining time)\n");
             return Ipc::Result::BadInput;
         }
         
@@ -391,7 +391,7 @@ namespace alefbet::pctrl::srv {
             gui_.hideRemainingTimePanel();
         }*/
 
-        logToFile("[Service] Ok\n");
+        logDebug("[Service] Ok\n");
         return Ipc::Result::Ok;
     }
 
@@ -399,7 +399,7 @@ namespace alefbet::pctrl::srv {
         auto settings = loadSettings();
 
         if(!settings.contains(SETTING_SHOW_REMAINING_TIME)) {
-            logToFile("[Service] The setting %s is not defined.\n", SETTING_SHOW_REMAINING_TIME);
+            logDebug("[Service] The setting %s is not defined.\n", SETTING_SHOW_REMAINING_TIME);
             request->appendReplyValue(0);
         } else {
             request->appendReplyValue(settings[SETTING_SHOW_REMAINING_TIME].int_value);
@@ -409,7 +409,7 @@ namespace alefbet::pctrl::srv {
     }
 
     Ipc::Result Service::isEnabled(Ipc::Request* request) {
-        logToFile("[Service] getting current service state: %i\n", enabled_);
+        logDebug("[Service] getting current service state: %i\n", enabled_);
 
         request->appendReplyValue(enabled_ ? (u8)1 : (u8)0);
         return Ipc::Result::Ok;
@@ -418,10 +418,10 @@ namespace alefbet::pctrl::srv {
     Ipc::Result Service::setEnabled(Ipc::Request* request) {        
         bool isEnabled = false;        
         Ipc::Result rc = request->readRequestValue(isEnabled);
-        logToFile("[Service] setting service state to %s\n", (isEnabled ? "enabled" : "disabled"));
+        logDebug("[Service] setting service state to %s\n", (isEnabled ? "enabled" : "disabled"));
 
         if(rc != Ipc::Result::Ok) {
-            logToFile("[Service] Could not read data (enabled)\n");
+            logError("[Service] Could not read data (enabled)\n");
             return Ipc::Result::BadInput;
         }
 
@@ -445,7 +445,7 @@ namespace alefbet::pctrl::srv {
     }
 
     Ipc::Result Service::getDailyLimit(Ipc::Request* request) {
-        logToFile("[Service] Getting the daily limit\n");
+        logDebug("[Service] Getting the daily limit\n");
 
         auto settings = loadSettings();        
         u16 limit_in_minutes = 0;
@@ -460,12 +460,12 @@ namespace alefbet::pctrl::srv {
     }
 
     Ipc::Result Service::setDailyLimit(Ipc::Request* request) {
-        logToFile("[Service] Setting the daily limit\n");
+        logDebug("[Service] Setting the daily limit\n");
 
         u16 limit = 0;
         Ipc::Result rc = request->readRequestValue(limit);
         if(rc != Ipc::Result::Ok) {
-            logToFile("[Service] Could not read the daily limit\n");
+            logError("[Service] Could not read the daily limit\n");
             return Ipc::Result::BadInput;
         }        
 
@@ -477,21 +477,55 @@ namespace alefbet::pctrl::srv {
         };
 
         saveSetting(settings, setting);
-        logToFile("[Service] Daily limit is set to %i minutes\n", limit);
+        logDebug("[Service] Daily limit is set to %i minutes\n", limit);
 
         return Ipc::Result::Ok;
     }
 
     Ipc::Result Service::getCurrentVersion(Ipc::Request* request) {
-        logToFile("[Service] Getting current version: %s\n", VERSION);
+        logDebug("[Service] Getting current version: %s\n", VERSION);
 
         std::string _ver = VERSION;
         request->appendReplyValue(_ver);
         return Ipc::Result::Ok;
     }    
 
+    Ipc::Result Service::setLogLevel(Ipc::Request* request) {
+        logDebug("[Service] Setting log level\n");
+
+        u8 level = 0;
+        Ipc::Result rc = request->readRequestValue(level);
+        if(rc != Ipc::Result::Ok) {
+            logError("[Service] Could not read the log level value\n");
+            return Ipc::Result::BadInput;
+        }
+
+        auto settings = loadSettings();
+        auto setting = Setting{
+            .key = SETTING_LOGLEVEL,
+            .type = INTEGER,
+            .int_value = level
+        };
+
+        saveSetting(settings, setting);
+        
+        logger::setLogLevel(static_cast<LogLevel>(level));
+        //logInfo("[Service] Log level set to %i\n", level);        
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result Service::getLogLevel(Ipc::Request* request) {
+        logDebug("[Service] Getting current log level\n");
+
+        u16 logLevel = currentLogLevel();
+        request->appendReplyValue(logLevel);
+        
+        return Ipc::Result::Ok;
+    } 
+
     void delayedTimeout(void* arg) {
-        logToFile("[Service] Delayed task\n");
+        logDebug("[Service] Delayed task\n");
         Service* svc = static_cast<Service*>(arg);
         svcSleepThread(1'000'000'000LL);
         svc->showScreenTimeout();
@@ -499,7 +533,7 @@ namespace alefbet::pctrl::srv {
 
     Ipc::Result Service::commandThread(Ipc::Request* request) {
         const auto cmd = static_cast<Ipc::Command>(request->cmd());
-        logToFile("[Service] request received: %s\n", Ipc::commandToString(cmd).c_str());
+        logDebug("[Service] request received: %s\n", Ipc::commandToString(cmd).c_str());
 
         switch (cmd) {   
             case Ipc::Command::Version: {
@@ -565,8 +599,14 @@ namespace alefbet::pctrl::srv {
             case Ipc::Command::SetDailyLimit: {
                 return setDailyLimit(request);
             }
+            case Ipc::Command::SetLogLevel: {
+                return setLogLevel(request);
+            }
+            case Ipc::Command::GetLogLevel: {
+                return getLogLevel(request);
+            }
             default: {
-                logToFile("[Service] command %i not handled.\n", request->cmd());                
+                logError("[Service] command %i not handled.\n", request->cmd());                
                 return Ipc::Result::UnknownCommand;
             }
         }        
@@ -575,7 +615,7 @@ namespace alefbet::pctrl::srv {
     }
     
     void Service::listen() {                
-        logToFile("[Service] Starting listening\n");
+        logInfo("[Service] Starting listening\n");
 
         while(true) {            
             if (!ipcServer_->process()) {
@@ -586,7 +626,7 @@ namespace alefbet::pctrl::srv {
             svcSleepThread(5'000);
         }
 
-        logToFile("[Service] Stopped listening\n");
+        logInfo("[Service] Stopped listening\n");
     }
 
 }

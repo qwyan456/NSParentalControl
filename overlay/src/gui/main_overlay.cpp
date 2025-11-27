@@ -3,16 +3,16 @@
 #include "panel_main_menu.h"
 #include "logger.h"
 
+using namespace alefbet::pctrl::logger;
+
 MainOverlay::MainOverlay() {    
 }
 
 extern "C" u64 __nx_vi_layer_id;
 
 std::unique_ptr<tsl::Gui> MainOverlay::loadInitialGui() {
-    logToFile("loadInitialGui. __nx_vi_layer_id=");
-    logIntToFile(__nx_vi_layer_id);
-    logToFile("aruid=");
-    logIntToFile(appletGetAppletResourceUserId());
+    logDebug("loadInitialGui. __nx_vi_layer_id=%i\n", __nx_vi_layer_id);
+    logDebug("aruid=%i\n", appletGetAppletResourceUserId());
     return initially<MainMenuPanel>(); 
 }
 

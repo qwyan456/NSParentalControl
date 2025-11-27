@@ -14,6 +14,7 @@
 #include "helpers/ipc_helpers.h"
 
 using namespace alefbet::pctrl;
+using namespace alefbet::pctrl::logger;
 using namespace std::chrono;
 
 MainMenuPanel::MainMenuPanel() {    
@@ -56,17 +57,14 @@ void MainMenuPanel::rebuildUI() {
 
     // Current User
     auto currentTitle = ipc::getCurrentTitle();
-    logToFile("title=");
-    logToFile(currentTitle.c_str());
+    logDebug("title=%s\n", currentTitle.c_str());
 
     if(!currentTitle.empty() && !currentTitle.starts_with("Err#")) {
         auto currentUserUid = ipc::getCurrentUserUid();
-        logToFile("user id=");
-        logToFile(currentUserUid.c_str());
+        logDebug("user id=%s\n", currentUserUid.c_str());
 
         auto currentUserNickname = ipc::getCurrentUserNickname();        
-        logToFile("user name=");
-        logToFile(currentUserNickname.c_str());        
+        logDebug("user name=%s\n", currentUserNickname.c_str());        
 
         auto entryUser = new tsl::elm::ListItem("User: " +currentUserNickname);
         rootList_->addItem(entryUser);

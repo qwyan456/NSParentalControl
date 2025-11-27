@@ -6,8 +6,8 @@ namespace alefbet::pctrl::gui {
     #define TRY_AND_RETURN(res_expr, message)                                 \
     {                                                                         \
         if (const auto _tmp_r_try_rc = (res_expr); _tmp_r_try_rc != 0) {      \
-            alefbet::pctrl::logger::logToFile(message);                       \
-            alefbet::pctrl::logger::logToFile("Error %i\n", _tmp_r_try_rc);   \
+            alefbet::pctrl::logger::logError(message);                       \
+            alefbet::pctrl::logger::logError("Error %i\n", _tmp_r_try_rc);   \
             return 1;                                                         \
         }                                                                     \
     }                                                                         \

@@ -81,7 +81,7 @@ namespace alefbet {
                         LayerWidth  = FramebufferWidth;
                         LayerHeight = FramebufferHeight;
                         
-                        logToFile("[Renderer] LayerWidth=%i, LayerHeight=%i, LayerPosX=%i, LayerPosY=%i, FramebufferWidth=%i, FramebufferHeight=%i\n", LayerWidth, LayerHeight, LayerPosX, LayerPosY, FramebufferWidth, FramebufferHeight);
+                        logDebug("[Renderer] LayerWidth=%i, LayerHeight=%i, LayerPosX=%i, LayerPosY=%i, FramebufferWidth=%i, FramebufferHeight=%i\n", LayerWidth, LayerHeight, LayerPosX, LayerPosY, FramebufferWidth, FramebufferHeight);
 
                         if (this->m_initialized)
                             return;
@@ -90,27 +90,27 @@ namespace alefbet {
 
                         Result rc = smInitialize();
                         rc = viInitialize(ViServiceType_Manager);
-                        logToFile("viInitialize %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        logDebug("viInitialize %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = viOpenDefaultDisplay(&this->m_display);
-                        logToFile("viOpenDefaultDisplay %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        logDebug("viOpenDefaultDisplay %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = viGetDisplayVsyncEvent(&this->m_display, &this->m_vsyncEvent);
-                        logToFile("viGetDisplayVsyncEvent %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        logDebug("viGetDisplayVsyncEvent %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         //u64 aruid = appletGetAppletResourceUserId();
                         //logToFile("[Renderer] aruid=%i\n", aruid);
                         //rc = viCreateManagedLayer(&this->m_display, static_cast<ViLayerFlags>(0), 0, &__nx_vi_layer_id);
                         rc = viCreateLayer(&this->m_display, &this->m_layer);
-                        logToFile("__nx_vi_layer_id=%i\n", __nx_vi_layer_id);
-                        logToFile("viCreateLayer %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        logDebug("__nx_vi_layer_id=%i\n", __nx_vi_layer_id);
+                        logDebug("viCreateLayer %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = viSetLayerScalingMode(&this->m_layer, ViScalingMode_FitToLayer);
                         //rc = viSetLayerScalingMode(&this->m_layer, ViScalingMode_PreserveAspectRatio);
 
                         /*if (s32 layerZ = 0; R_SUCCEEDED(viGetZOrderCountMax(&this->m_display, &layerZ)) && layerZ > 0) {
                             rc = viSetLayerZ(&this->m_layer, layerZ);
-                            logToFile("[Renderer] viSetLayerZ %i:%i, layerZ=%i\n", R_MODULE(rc), R_DESCRIPTION(rc), layerZ);
+                            logDebug("[Renderer] viSetLayerZ %i:%i, layerZ=%i\n", R_MODULE(rc), R_DESCRIPTION(rc), layerZ);
                         }*/
                         
                         rc = viSetLayerZ(&this->m_layer, 99);
-                        logToFile("viSetLayerZ %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        logDebug("viSetLayerZ %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         //rc = viAddToLayerStack(&this->m_layer, ViLayerStack_Default);
                         
 
@@ -124,13 +124,13 @@ namespace alefbet {
                         rc = viAddToLayerStack(&this->m_layer, ViLayerStack_Lcd);*/
                         
                         rc = viSetLayerSize(&this->m_layer, LayerWidth, LayerHeight);
-                        logToFile("viSetLayerSize %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        logDebug("viSetLayerSize %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = viSetLayerPosition(&this->m_layer, LayerPosX, LayerPosY);
-                        logToFile("viSetLayerPosition %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        logDebug("viSetLayerPosition %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = nwindowCreateFromLayer(&this->m_window, &this->m_layer);
-                        logToFile("nwindowCreateFromLayer %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        logDebug("nwindowCreateFromLayer %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = framebufferCreate(&this->m_framebuffer, &this->m_window, FramebufferWidth, FramebufferHeight, PIXEL_FORMAT_RGBA_4444, 2);
-                        logToFile("framebufferCreate %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        logDebug("framebufferCreate %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = setInitialize();
                         rc = initFonts();
                         setExit();
@@ -544,20 +544,20 @@ namespace alefbet {
                         if (!this->m_initialized)
                             return;
 
-                        logToFile("[Renderer] exit\n");
+                        logDebug("[Renderer] exit\n");
                         framebufferClose(&this->m_framebuffer);
-                        logToFile("[Renderer] fb closed\n");
+                        logDebug("[Renderer] fb closed\n");
                         nwindowClose(&this->m_window);
-                        logToFile("[Renderer] window closed\n");
+                        logDebug("[Renderer] window closed\n");
                         //viDestroyManagedLayer(&this->m_layer);
                         Result rc = viCloseLayer(&this->m_layer);
-                        logToFile("[Renderer] layer closed %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        logDebug("[Renderer] layer closed %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = viCloseDisplay(&this->m_display);
-                        logToFile("[Renderer] display closed %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        logDebug("[Renderer] display closed %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         eventClose(&this->m_vsyncEvent);
-                        logToFile("[Renderer] event closed\n");
+                        logDebug("[Renderer] event closed\n");
                         viExit();
-                        logToFile("[Renderer] vi closed\n");
+                        logDebug("[Renderer] vi closed\n");
                         this->m_initialized = false;
                     }
 
@@ -696,27 +696,19 @@ namespace alefbet {
                         if (!fb || !fb->has_init)
                             return;
 
-                        logToFile("1\n");
                         if (fb->buf_linear)
                             free(fb->buf_linear);
 
                         if (fb->buf) {                            
                             nwindowReleaseBuffers(fb->win);
-                            logToFile("2\n");
                             nvMapClose(&fb->map);
-                            logToFile("3\n");
                             free(fb->buf);
-                            logToFile("4\n");
                         }
 
                         memset(fb, 0, sizeof(*fb));
-                        logToFile("5\n");
                         nvFenceExit();
-                        logToFile("6\n");
                         nvMapExit();
-                        logToFile("7\n");
                         nvExit();
-                        logToFile("8\n");
                     }*/
 
                 private:

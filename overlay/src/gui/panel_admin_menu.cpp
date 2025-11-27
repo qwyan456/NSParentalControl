@@ -4,12 +4,14 @@
 #include "Command.hpp"
 #include "AppContext.h"
 #include "version.h"
+#include "logger.h"
 #include "helpers/ipc_helpers.h"
 #include "panel_setuppin.h"
 #include "panel_main_menu.h"
 #include "panel_setup_limits.h"
 
 using namespace alefbet::pctrl;
+using namespace alefbet::pctrl::logger;
 
 AdminMenuPanel::AdminMenuPanel() {    
 }
@@ -33,18 +35,15 @@ tsl::elm::Element* AdminMenuPanel::createUI() {
 void AdminMenuPanel::rebuildUI() {
 
     // Enable parental control
-    auto entryEnabled = new tsl::elm::ToggleListItem("Enabled", getAppContext().is_enabled);
+    auto entryEnabled = new tsl::elm::ToggleListItem("Enabled", getAppContext().is_enabled, "Enabled", "Disabled");
     rootList_->addItem(entryEnabled);        
-    entryEnabled->setClickListener([entryEnabled] (u64 keys) -> bool {
-        if(keys & HidNpadButton_A) {
-            bool res = ipc::setEnabled(entryEnabled->getState());
-            if(!res) {
-                entryEnabled->setState(!entryEnabled->getState());
-            }
-            return true;
+    entryEnabled->setStateChangedListener([entryEnabled] (bool enabled) -> bool {
+        bool res = ipc::setEnabled(enabled);
+        if(!res) {
+            entryEnabled->setState(!entryEnabled->getState());
         }
 
-        return false;
+        return true;
     });
 
     // Setup PIN
@@ -82,16 +81,12 @@ void AdminMenuPanel::rebuildUI() {
     const auto& remainingTimeVisibility = ipc::getShowRemainingTime();
     auto entryShowRemainingTime = new tsl::elm::ToggleListItem("Notify remaining time", remainingTimeVisibility);
     rootList_->addItem(entryShowRemainingTime);
-    entryShowRemainingTime->setClickListener([entryShowRemainingTime](u64 keys) -> bool {
-        if(keys & HidNpadButton_A) {            
-            bool res = ipc::setShowRemainingTime(entryShowRemainingTime->getState());
-            if(!res) {
-                entryShowRemainingTime->setState(!entryShowRemainingTime->getState());
-            }
-            return true;
+    entryShowRemainingTime->setStateChangedListener([entryShowRemainingTime](bool enabled) -> bool {
+        bool res = ipc::setShowRemainingTime(enabled);
+        if(!res) {
+            entryShowRemainingTime->setState(!entryShowRemainingTime->getState());
         }
-
-        return false;
+        return true;        
     });
 
     // Setup limits
@@ -106,10 +101,26 @@ void AdminMenuPanel::rebuildUI() {
         return false;
     });
 
+    // Log level
+    const auto& debugLogEnabled = ipc::isDebugLogEnabled();
+    auto logLevelEntry = new tsl::elm::ToggleListItem("Log level", debugLogEnabled, "DEBUG", "INFO");
+    rootList_->addItem(logLevelEntry);
+    logLevelEntry->setStateChangedListener([logLevelEntry](bool enabled) -> bool {
+        logDebug("Set log level");
+        bool res = ipc::enableDebugLog(enabled);
+        if(!res) {
+            logLevelEntry->setState(!logLevelEntry->getState());
+        } else {
+            getAppContext().is_debug = enabled;
+            setLogLevel(enabled ? DEBUG : INFO);
+        }
+
+        return true;
+    });
+
     rootList_->addItem(new tsl::elm::CategoryHeader("Versions"));
     rootList_->addItem(new tsl::elm::ListItem("Overlay", "v" +std::string(VERSION)));
     rootList_->addItem(new tsl::elm::ListItem("Sysmodule", ipc::getVersion()));        
-
 
     rootFrame_->setContent(rootList_);
 }

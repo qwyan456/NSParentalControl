@@ -5,6 +5,8 @@
 #include <ranges>
 #include <vector>
 
+using namespace alefbet::pctrl::logger;
+
 namespace alefbet {
     namespace pctrl {
         namespace helpers {        
@@ -16,7 +18,7 @@ namespace alefbet {
 
                 Result rc = accountInitialize(AccountServiceType_System);
                 if(R_FAILED(rc)) {
-                    logToFile("[Service] Could not connect to service account\n");
+                    logError("[Service] Could not connect to service account (%i:%i)\n", R_MODULE(rc), R_DESCRIPTION(rc));
                     return std::list<UserData>{};
                 }
 
@@ -25,7 +27,7 @@ namespace alefbet {
 
                 rc = accountListAllUsers(_users, ACC_USER_LIST_SIZE, &count);
                 if(R_FAILED(rc)) {
-                    logToFile("[Service] Could not enumerate users\n");
+                    logError("[Service] Could not enumerate users (%i:%i)\n", R_MODULE(rc), R_DESCRIPTION(rc));
                     return std::list<UserData>{};
                 }
 
@@ -37,19 +39,19 @@ namespace alefbet {
                     const auto& uid = _users[i];
                     rc = accountGetProfile(&profile, uid); 
                     if(rc != 0) {
-                        logToFile("[Helpers] Could not get account profile");
+                        logError("[Helpers] Could not get account profile (%i:%i)\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         accountExit();                        
                     } else {
-                        logToFile("[Helpers] accountGetProfile() ok\n");
+                        logDebug("[Helpers] accountGetProfile() ok\n");
                     }
 
                     rc = accountProfileGet(&profile, &user_data, &base);
                     if(rc != 0) {
-                        logToFile("[Helpers] Could not get user data");
+                        logError("[Helpers] Could not get user data (%i:%i)\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         accountProfileClose(&profile);
                         accountExit();                        
                     } else {
-                        logToFile("[Helpers] accountProfileGet() ok\n");
+                        logDebug("[Helpers] accountProfileGet() ok\n");
                     }
 
                     UserData user;
@@ -75,8 +77,7 @@ namespace alefbet {
                 }
                 
                 if(parts.size() != 2) {
-                    logToFile("[Helpers] Incorrect split of AccountUid");
-                    logToFile(uid_str.c_str());
+                    logError("[Helpers] Incorrect split of AccountUid : %s\n", uid_str.c_str());
                     return uid;
                 }
 
