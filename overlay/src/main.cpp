@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
 
     // Get current log level
     bool debugEnabled = alefbet::pctrl::ipc::isDebugLogEnabled();
-    getAppContext().is_debug = debugEnabled;
+    //getAppContext().is_debug = debugEnabled;
     setLogLevel(debugEnabled ? DEBUG : INFO);  
 
     tsl::loop<MainOverlay>(argc, argv);    

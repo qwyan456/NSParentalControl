@@ -4,6 +4,8 @@ NS Parental Control is a simple parental control system for the Nintendo Switch 
 
 It can be used freely.
 
+The user manual can be found [here](docs/manual.md).
+
 ## Current version
 
 [1.2](https://github.com/TristanIsrael/NSParentalControl/releases/latest)

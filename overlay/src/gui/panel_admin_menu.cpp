@@ -111,7 +111,7 @@ void AdminMenuPanel::rebuildUI() {
         if(!res) {
             logLevelEntry->setState(!logLevelEntry->getState());
         } else {
-            getAppContext().is_debug = enabled;
+            //getAppContext().is_debug = enabled;
             setLogLevel(enabled ? DEBUG : INFO);
         }
 

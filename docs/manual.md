@@ -50,7 +50,7 @@ The admin menu is protected with a PIN.. The default PIN is `A A A A`.
 ```
 Enabled                 Enabled
 Set PIN
-WorkingMode             Blocking
+Working mode            Blocking
 Notify remaining time   Activate
 Setup limits
 Log level
@@ -59,3 +59,20 @@ Versions
   Overlay               v1.2
   Sysmodule             v1.2
 ```
+
+- `Enabled` is a switch for enabling and disabling the parental control. When it disabled it does not count play time anymore.
+- `Set PIN` opens a new menu for setting the Admin PIN (see [Admin PIN setup](#admin-pin-setup)).
+- `Working mode` lets you define whether the system will be blocked at the end of play time or the play time is only shown on screen as a badge (Currently the only value is `Blocking`).
+- `Notify remaining time` is a switch for enabling notifications about the remaining time. When enabled, a notification is shown every 15 minutes, and every minute during the last 5 minutes. **This feature is only availble when Ultrahand overlay is used**.
+- `Setup limits` lets you define the play time limits (See [Setup limits](#setup-limits)).
+- `Log level` lets you define the log level to DEBUG or INFO in the sysmodule and the overlay. Use DEBUG only when needed because it can generates big files.
+
+#### Admin PIN setup
+
+This screen lets you define a PIN for the Administrator of the Parental Control. The PIN can be defined with any pad button or combination.
+
+#### Setup limits
+
+This screen lets you define the unique play time limit for all the players. Each player has its own play time but the limit is the same for every player.
+
+In case you want more time to play for a single player you will have to disable the parental control temporarilty.
