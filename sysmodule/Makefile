@@ -39,9 +39,9 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	pctrl
 BUILD		:=	build.nosync
-SOURCES		:=	source source/database source/ipc source/gui
+SOURCES		:=	source source/database source/ipc source/gui import
 DATA		:=	data
-INCLUDES	:=	source source/database source/ipc source/gui
+INCLUDES	:=	source source/database source/ipc source/gui ../tiny-AES-c
 APP_VERSION	:=	1.2
 
 #ifeq ($(RELEASE),)
@@ -88,7 +88,8 @@ export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
 
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
-CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+EXT_CFILES 	:=  ../tiny-AES-c/aes.c
+CFILES		:=	$(shell mkdir -p $(CURDIR)/import; cp $(EXT_CFILES) $(CURDIR)/import) $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c))) 
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
@@ -165,11 +166,12 @@ endif
 #---------------------------------------------------------------------------------
 all: $(BUILD)
 
-$(BUILD):
+$(BUILD):	
 	mkdir -p $(OUTDIR)
 	@[ -d $@ ] || mkdir -p $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 	cp $(OUTPUT).nsp $(OUTDIR)/exefs.nsp
+	rm -rf $(CURDIR)/import
 
 #---------------------------------------------------------------------------------
 clean:

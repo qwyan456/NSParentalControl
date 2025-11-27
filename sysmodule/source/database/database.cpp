@@ -11,6 +11,7 @@
 #include "json.hpp"
 #include "../logger.h"
 #include "../helpers.h"
+#include "aes.hpp"
 
 using json = nlohmann::json;
 using namespace alefbet::pctrl::logger;
@@ -29,8 +30,51 @@ namespace alefbet::pctrl::database {
     static bool ready = false;
     static bool data_synchronized = false; // The data are synchronized between the cache and the file
     static bool settings_synchronized = false; 
+    static bool cipher_ready = false;
     static History history;
     static Settings settings;
+
+    namespace cipher {
+        static struct AES_ctx aes_ctx;
+
+        void initCipher() {
+            Result rc = setcalInitialize();
+            if(R_FAILED(rc)) {
+                logError("[Database] Could not connect to SetSys to initialize key\n");
+                return;
+            }
+
+            // Get the device ID
+            u64 deviceId = 0;
+            rc = setcalGetDeviceId(&deviceId);
+            if(R_FAILED(rc)) {
+                logError("[Database] Failed to get Device ID for ciphering\n");
+                return;
+            }
+
+            // Derivate a hash
+            u8 hash[32] = {0};
+            sha256CalculateHash(hash, (u8*)&deviceId, sizeof(deviceId));
+
+            // Create a 128 bit key
+            u8 cipher_key[16];
+            memcpy(cipher_key, hash, 16);
+
+            // Initialize AES context
+            AES_init_ctx(&aes_ctx, cipher_key);            
+
+            setcalExit();
+            cipher_ready = true;
+        }
+
+        void cipherBuffer(u8* buffer, u64 size) {
+            AES_CBC_encrypt_buffer(&aes_ctx, buffer, size);
+        }
+
+        void decipherBuffer(u8* buffer, u64 size) {
+            AES_CBC_decrypt_buffer(&aes_ctx, buffer, size);
+        }
+    }
 
     bool prepare() {
         if(ready) return true;
@@ -39,6 +83,10 @@ namespace alefbet::pctrl::database {
         if(!ready) {
             logError("[Database] Could not get access to SD card\n");
         }
+
+        // Initialize ciphering
+        cipher::initCipher();
+        logInfo("[Database] Data ciphering is %s\n", cipher_ready ? "ready" : "not ready");
 
         return ready;
     }
@@ -124,6 +172,12 @@ namespace alefbet::pctrl::database {
             }
 
             data_sessions[fileSize] = '\0';
+
+            // Decipher if needed
+            if(cipher_ready) {
+                cipher::decipherBuffer(data_sessions, fileSize);
+            }
+
             logDebug("[Database] Sessions data: %s\n", data_sessions);
             logDebug("[Database] Parse sessions file\n");
             json j_settings = json::parse(data_sessions);
@@ -185,11 +239,21 @@ namespace alefbet::pctrl::database {
             return;
         }
 
-        const auto data = j_history.dump();
-        const auto s_data = data.c_str();
+        const auto stdstr_data = j_history.dump();
+        const auto str_data = stdstr_data.c_str();
+        u64 lenstr = std::strlen(str_data);
+        void* s_data = malloc(lenstr+1);
+        memset(s_data, 0, lenstr);
+        memcpy(s_data, str_data, lenstr);
 
-        logDebug("[Database] Writing sessions data %s (size=%i)\n", s_data, std::strlen(s_data));    
-        if(R_FAILED(fsFileWrite(&handle_database, 0, s_data, std::strlen(s_data), FsWriteOption_Flush))) {
+        logDebug("[Database] Writing sessions data %s (size=%i)\n", s_data, lenstr);    
+
+        // Cipher the data if needed
+        if(cipher_ready) {
+            cipher::cipherBuffer((u8*)s_data, lenstr);
+        }
+
+        if(R_FAILED(fsFileWrite(&handle_database, 0, s_data, lenstr, FsWriteOption_Flush))) {
             logError("[Database] Could not write into database file\n");
         }
 
