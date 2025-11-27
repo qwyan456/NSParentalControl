@@ -27,6 +27,10 @@ namespace alefbet::pctrl::database {
     static FsFile handle_database;
     static std::mutex mutex_database;
     static bool ready = false;
+    static bool data_synchronized = false; // The data are synchronized between the cache and the file
+    static bool settings_synchronized = false; 
+    static History history;
+    static Settings settings;
 
     bool prepare() {
         if(ready) return true;
@@ -54,13 +58,16 @@ namespace alefbet::pctrl::database {
         return result;
     }
 
-    History loadDatabase()
-    {            
+    void loadDatabase()
+    {   
+        // We load the file only when the data are not up to date                 
+        if(data_synchronized) return;
+
         std::lock_guard<std::mutex> lock(mutex_database);
 
         logDebug("[Database] Loading database at %s\n", DB_FILENAME);
 
-        if(!prepare()) return History{};
+        if(!prepare()) return;
 
         bool opened = R_SUCCEEDED(fsFsOpenFile(&sdmc, DB_FILENAME, FsOpenMode_Read, &handle_database));
         History history;
@@ -74,20 +81,20 @@ namespace alefbet::pctrl::database {
                 // The directory does not exist
                 if(!createDataDirectory()) {
                     logError("[Database] The data directory could not be created.\n");
-                    return history;
+                    return;
                 }
             }
 
             if(R_FAILED(fsFsCreateFile(&sdmc, DB_FILENAME, 0, 0))) {
                 logError("[Database] Could not create a new database file.\n");
-                return history;
+                return;
             }
         } else {
             s64 fileSize = 0;
             if(R_FAILED(fsFileGetSize(&handle_database, &fileSize))) {
                 logError("[Database] Could not get database file size\n");
                 fsFileClose(&handle_database);
-                return history;
+                return ;
             } else {
                 logDebug("[Database] Database file size is %i\n", fileSize);
             }
@@ -95,14 +102,14 @@ namespace alefbet::pctrl::database {
             if(fileSize == 0) {
                 logError("[Database] Database file is empty\n");
                 fsFileClose(&handle_database);
-                return history;
+                return;
             }
 
             u8* data_sessions = new u8[fileSize+1];            
             if(data_sessions == nullptr) {
                 logError("[Database] Could not create a buffer for sessions\n");
                 fsFileClose(&handle_database);
-                return history;
+                return;
             } else {
                 logDebug("[Database] sessions buffer ready at @%p\n", (void*)data_sessions);
             }
@@ -111,7 +118,7 @@ namespace alefbet::pctrl::database {
             if(R_FAILED(fsFileRead(&handle_database, 0, data_sessions, fileSize, FsReadOption_None, &dataRead))) {
                 logError("[Database] Could not read the database file\n");
                 fsFileClose(&handle_database);
-                return history;
+                return;
             } else {
                 logDebug("[Database] Sessions database read\n");
             }
@@ -138,10 +145,10 @@ namespace alefbet::pctrl::database {
             delete[] data_sessions;
         }
 
-        return history;
+        data_synchronized = true;
     }
 
-    void saveDatabase(const History& history) {       
+    void saveDatabase(const History& history) {
         std::lock_guard<std::mutex> lock(mutex_database);
 
         if(!prepare()) return;
@@ -191,7 +198,7 @@ namespace alefbet::pctrl::database {
 
     std::vector<HistoryEntry> getHistory(AccountUid uid, std::string date) {
         //Get current history
-        History history = loadDatabase();
+        loadDatabase();
 
         return history.entries(uid, date);
     }
@@ -208,7 +215,7 @@ namespace alefbet::pctrl::database {
         std::string uidToString = accountUidToString(uid);
 
         //Get current history
-        History history = loadDatabase();
+        loadDatabase();
 
         const auto& date = today();
         if(date.empty()) {
@@ -237,12 +244,14 @@ namespace alefbet::pctrl::database {
     }
 
     Settings loadSettings() {
+        // We load the file only when the settings are not synchronized
+        if(settings_synchronized) return settings;
+
         logDebug("[Database] Loading settings at %s\n", SETTINGS_FILENAME);
 
         if(!prepare()) return Settings{};
 
         bool opened = R_SUCCEEDED(fsFsOpenFile(&sdmc, SETTINGS_FILENAME, FsOpenMode_Read, &handle_settings));
-        Settings settings;
 
         if(!opened) {
             logError("Could not open settings file. Initialise default settings.\n");
@@ -330,12 +339,13 @@ namespace alefbet::pctrl::database {
 
             fsFileClose(&handle_settings);
             delete[] data_settings;
+            settings_synchronized = true;
         }
-
+        
         return settings;
     }
 
-    void saveSetting(Settings& settings, Setting setting) {
+    void saveSetting(Settings& settings, Setting setting) {        
         //Update settings internal structure
         settings[setting.key] = setting;  
         saveSettings(settings);      
