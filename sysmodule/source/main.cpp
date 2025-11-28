@@ -143,6 +143,8 @@ int main(int argc, char **argv)
     if(settings.contains(SETTING_LOGLEVEL)) {
         const auto& logLevel = settings[SETTING_LOGLEVEL].int_value;
         setLogLevel(static_cast<LogLevel>(logLevel));
+    } else {
+        setLogLevel(INFO);
     }
 
     logInfo("[Main] Parental control starting\n");

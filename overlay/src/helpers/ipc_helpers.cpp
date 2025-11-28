@@ -495,4 +495,47 @@ namespace alefbet::pctrl::ipc {
         return true;
     }
 
+    bool isDatabaseTampered() {
+        logDebug("[IPC] Verifying whether database has been tampered\n");
+
+        if(!isAvailable()) {
+            logError("[IPC] service not available\n");
+            return 0;
+        }
+
+        u8 tampered = 0;
+
+        auto& service = getAppContext().pctrl_service;
+        Result res = serviceDispatchOut(&service, (u32)Ipc::Command::IsTampered, tampered);
+
+        if(R_FAILED(res)) {
+            logError("[IPC] An error occured while getting the tampered state.\n");
+        } 
+
+        logDebug("[IPC] Tampered state is %i\n", tampered ? "tampered" : "clean");
+
+        return tampered != 0;
+    }
+
+    bool isDatabaseNeedsUpgrade() {
+        logDebug("[IPC] Verifying whether database needs upgrade\n");
+
+        if(!isAvailable()) {
+            logError("[IPC] service not available\n");
+            return 0;
+        }
+
+        u8 mustUpgrade = 0;
+
+        auto& service = getAppContext().pctrl_service;
+        Result res = serviceDispatchOut(&service, (u32)Ipc::Command::MustUpgradeDatabase, mustUpgrade);
+
+        if(R_FAILED(res)) {
+            logError("[IPC] An error occured while getting the tampered state.\n");
+        } 
+
+        logDebug("[IPC] Needs upgrade is %i\n", mustUpgrade ? "true" : "false");
+
+        return mustUpgrade != 0;
+    }    
 }

@@ -19,6 +19,7 @@ struct Setting {
     u64 int_value = 0;
     double double_value = 0.0;
     std::string string_value;
+    bool encrypted = false;
 };
 
 typedef enum {

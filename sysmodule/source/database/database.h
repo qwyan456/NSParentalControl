@@ -21,4 +21,7 @@ namespace alefbet::pctrl::database {
     Settings loadSettings();
     void saveSettings(Settings& settings);
     void saveSetting(Settings& settings, Setting setting);
+
+    bool upgradeNeeded();
+    bool isTampered();
 }

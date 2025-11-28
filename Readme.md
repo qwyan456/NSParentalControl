@@ -184,4 +184,3 @@ https://github.com/switchbrew/switch-examples/tree/master
 - Sean Barrett for STB Truetype library.
 - @WerWolv for [Tesla library](https://github.com/WerWolv/libtesla).
 - @ppkantorski for [Ultrahand Overlay](https://github.com/ppkantorski/Ultrahand-Overlay).
-- @kokke for [Tiny AES](https://github.com/kokke/tiny-AES-c).

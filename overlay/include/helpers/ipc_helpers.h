@@ -47,4 +47,7 @@ namespace alefbet::pctrl::ipc {
     bool enableDebugLog(bool enable);
 
     std::string getVersion();    
+
+    bool isDatabaseTampered();
+    bool isDatabaseNeedsUpgrade();
 }

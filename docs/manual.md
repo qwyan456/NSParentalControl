@@ -10,7 +10,14 @@ First open the overlay using the combo defined in your Overlay manager.
 
 ### Main menu
 
-When no game has been started, the menu shows:
+When there are warnings they are shown at the top of the list:
+```
+ⓘ Database tampered! ---> Means that the database or settings data have been manually modified
+ⓘ Database need upgrade! ---> Means that the database format has changed and you have to change a value in the admin section to upgrade it (for example reset your PIN to the same value).
+```
+
+
+Then when no game has been started, the menu shows:
 
 ```
 No user / app started
@@ -49,11 +56,11 @@ The admin menu is protected with a PIN.. The default PIN is `A A A A`.
 
 ```
 Enabled                 Enabled
-Set PIN
 Working mode            Blocking
 Notify remaining time   Activate
-Setup limits
-Log level
+Log level               INFO
+Set PIN
+Set limits
 
 Versions
   Overlay               v1.2
@@ -61,11 +68,11 @@ Versions
 ```
 
 - `Enabled` is a switch for enabling and disabling the parental control. When it disabled it does not count play time anymore.
-- `Set PIN` opens a new menu for setting the Admin PIN (see [Admin PIN setup](#admin-pin-setup)).
 - `Working mode` lets you define whether the system will be blocked at the end of play time or the play time is only shown on screen as a badge (Currently the only value is `Blocking`).
-- `Notify remaining time` is a switch for enabling notifications about the remaining time. When enabled, a notification is shown every 15 minutes, and every minute during the last 5 minutes. **This feature is only availble when Ultrahand overlay is used**.
-- `Setup limits` lets you define the play time limits (See [Setup limits](#setup-limits)).
+- `Notify remaining time` is a switch for enabling notifications about the remaining time. When enabled, a notification is shown every 15 minutes, and every minute during the last 5 minutes. **This feature is only available when Ultrahand overlay is used**.
 - `Log level` lets you define the log level to DEBUG or INFO in the sysmodule and the overlay. Use DEBUG only when needed because it can generates big files.
+- `Set PIN` opens a new menu for setting the Admin PIN (see [Admin PIN setup](#admin-pin-setup)).
+- `Set limits` lets you define the play time limits (See [Setup limits](#setup-limits)).
 
 #### Admin PIN setup
 

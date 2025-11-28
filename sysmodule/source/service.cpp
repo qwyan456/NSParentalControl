@@ -289,7 +289,8 @@ namespace alefbet::pctrl::srv {
         Setting settingPin {
             .key = SETTING_ADMIN_PIN,
             .type = STRING,
-            .string_value = s_pin
+            .string_value = s_pin,
+            .encrypted = true
         };
 
         saveSetting(settings, settingPin);
@@ -524,6 +525,22 @@ namespace alefbet::pctrl::srv {
         return Ipc::Result::Ok;
     } 
 
+    Ipc::Result Service::isDatabaseTampered(Ipc::Request* request) {
+        logDebug("[Service] Verify whether database has been tampered\n");
+
+        request->appendReplyValue(static_cast<u8>(isTampered()));
+
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result Service::isMustUpgradeDatabase(Ipc::Request* request) {
+        logDebug("[Service] Verify whether database needs to be upgraded\n");
+
+        request->appendReplyValue(static_cast<u8>(upgradeNeeded()));
+
+        return Ipc::Result::Ok;
+    }
+
     void delayedTimeout(void* arg) {
         logDebug("[Service] Delayed task\n");
         Service* svc = static_cast<Service*>(arg);
@@ -604,6 +621,12 @@ namespace alefbet::pctrl::srv {
             }
             case Ipc::Command::GetLogLevel: {
                 return getLogLevel(request);
+            }
+            case Ipc::Command::IsTampered: {
+                return isDatabaseTampered(request);
+            } 
+            case Ipc::Command::MustUpgradeDatabase: {
+                return isMustUpgradeDatabase(request);
             }
             default: {
                 logError("[Service] command %i not handled.\n", request->cmd());                

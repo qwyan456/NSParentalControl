@@ -25,7 +25,9 @@ namespace Ipc {
         GetDailyLimit,              /*! Returns the current setting of the daily limit in minutes. */
         SetDailyLimit,              /*! Sets the daily limit in minutes. */
         SetLogLevel,                /*! Sets the log level */
-        GetLogLevel                 /*! Returns the current log level */
+        GetLogLevel,                /*! Returns the current log level */
+        IsTampered,                 /*! Returns true if the database or the settings have been modified externally */
+        MustUpgradeDatabase         /*! Returns true if the database must be upgraded */
     };
 
 };

@@ -65,6 +65,8 @@ namespace alefbet::pctrl::srv {
             Ipc::Result setDailyLimit(Ipc::Request*);
             Ipc::Result setLogLevel(Ipc::Request*);
             Ipc::Result getLogLevel(Ipc::Request*);
+            Ipc::Result isDatabaseTampered(Ipc::Request*);
+            Ipc::Result isMustUpgradeDatabase(Ipc::Request*);
 
         private:
             bool is_ready_ = false;

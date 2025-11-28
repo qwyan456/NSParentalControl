@@ -44,19 +44,7 @@ void AdminMenuPanel::rebuildUI() {
         }
 
         return true;
-    });
-
-    // Setup PIN
-    auto entrySetPin = new tsl::elm::ListItem("Set PIN");
-    rootList_->addItem(entrySetPin);
-    entrySetPin->setClickListener([](u64 keys) -> bool {
-        if(keys & HidNpadButton_A) {
-            tsl::changeTo<SetupPinPanel>();
-            return true;
-        }
-
-        return false;
-    });
+    });    
 
     // Set working mode
     /*const auto& workingMode = ipc::getWorkingMode();
@@ -89,18 +77,6 @@ void AdminMenuPanel::rebuildUI() {
         return true;        
     });
 
-    // Setup limits
-    auto entryLimits = new tsl::elm::ListItem("Setup limits");
-    rootList_->addItem(entryLimits);
-    entryLimits->setClickListener([](u64 keys) -> bool {
-        if(keys & HidNpadButton_A) {
-            tsl::changeTo<SetupLimitsPanel>();
-            return true;
-        }
-        
-        return false;
-    });
-
     // Log level
     const auto& debugLogEnabled = ipc::isDebugLogEnabled();
     auto logLevelEntry = new tsl::elm::ToggleListItem("Log level", debugLogEnabled, "DEBUG", "INFO");
@@ -116,6 +92,30 @@ void AdminMenuPanel::rebuildUI() {
         }
 
         return true;
+    });
+
+    // Setup PIN
+    auto entrySetPin = new tsl::elm::ListItem("Set PIN");
+    rootList_->addItem(entrySetPin);
+    entrySetPin->setClickListener([](u64 keys) -> bool {
+        if(keys & HidNpadButton_A) {
+            tsl::changeTo<SetupPinPanel>();
+            return true;
+        }
+
+        return false;
+    });
+
+    // Setup limits
+    auto entryLimits = new tsl::elm::ListItem("Set limits");
+    rootList_->addItem(entryLimits);
+    entryLimits->setClickListener([](u64 keys) -> bool {
+        if(keys & HidNpadButton_A) {
+            tsl::changeTo<SetupLimitsPanel>();
+            return true;
+        }
+        
+        return false;
     });
 
     rootList_->addItem(new tsl::elm::CategoryHeader("Versions"));

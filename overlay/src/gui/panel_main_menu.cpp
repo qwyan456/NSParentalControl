@@ -54,6 +54,34 @@ tsl::elm::Element* MainMenuPanel::createUI() {
 
 
 void MainMenuPanel::rebuildUI() {
+    // Special place for special messages (database tampered / needs upgrade)
+    bool specialMessages = false;
+    const auto& dbTampered = ipc::isDatabaseTampered();
+    const auto& mustUpgrade = ipc::isDatabaseNeedsUpgrade();
+    specialMessages = dbTampered || mustUpgrade;
+    if(specialMessages) {
+        //rootList_->addItem(new tsl::elm::CategoryHeader("Warnings"));
+        rootList_->addItem(new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *r, s32 x, s32 y, s32 width, s32 height) {
+                r->drawString(" ", false, x, y, 22, tsl::Color(0xffff));
+            }), 30);
+        
+        if(dbTampered) {
+            rootList_->addItem(new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *r, s32 x, s32 y, s32 width, s32 height) {
+                std::vector<std::string> symbols;
+                symbols.push_back("\ue150");
+                r->drawStringWithColoredSections("\ue150 Database tampered!", false, symbols, x, y, 22, tsl::Color(0xffff), tsl::Color(0xf00f));                    
+            }), 30);
+        }
+
+        if(mustUpgrade) {
+            rootList_->addItem(new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *r, s32 x, s32 y, s32 width, s32 height) {
+                std::vector<std::string> symbols;
+                symbols.push_back("\ue150");
+                r->drawStringWithColoredSections("\ue150 Database needs upgrade!", false, symbols, x, y, 22, tsl::Color(0xffff), tsl::Color(0xf00f));                    
+            }), 30);
+        }
+    }
+
 
     // Current User
     auto currentTitle = ipc::getCurrentTitle();
@@ -67,8 +95,8 @@ void MainMenuPanel::rebuildUI() {
         logDebug("user name=%s\n", currentUserNickname.c_str());        
 
         auto entryUser = new tsl::elm::ListItem("User: " +currentUserNickname);
-        rootList_->addItem(entryUser);
-        
+        rootList_->addItem(entryUser);        
+
         // Current game        
         auto entryTitle = new tsl::elm::ListItem("Playing: " +currentTitle);
         rootList_->addItem(entryTitle);
