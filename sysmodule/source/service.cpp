@@ -283,7 +283,7 @@ namespace alefbet::pctrl::srv {
 
         std::string s_pin = std::to_string(pin[0]) +"," +std::to_string(pin[1]) +"," +std::to_string(pin[2]) +"," +std::to_string(pin[3]);
 
-        logDebug("[Service] Setting admin PIN to %s", pin);
+        logDebug("[Service] Setting admin PIN to %s\n", s_pin.c_str());
         auto settings = loadSettings();
         
         Setting settingPin {

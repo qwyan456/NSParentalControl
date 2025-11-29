@@ -143,7 +143,7 @@ namespace alefbet::pctrl::database {
                 b ^= key;
         }
 
-        std::string encodeValue(const std::string& input) {
+        std::string encodeValue(const std::string input) {
             std::vector<u8> buf(input.begin(), input.end());
             u8 key = 0x31;
 
@@ -151,7 +151,7 @@ namespace alefbet::pctrl::database {
             return std::string(buf.begin(), buf.end());
         }
 
-        std::string decodeValue(const std::string& input) {
+        std::string decodeValue(const std::string input) {
             std::vector<u8> buf(input.begin(), input.end());
             u8 key = 0x31;
 
@@ -515,12 +515,13 @@ namespace alefbet::pctrl::database {
                             case INTEGER: setting.int_value = j_setting["value"].get<u64>(); break;
                             case DOUBLE: setting.double_value = j_setting["value"].get<double>(); break;
                             case STRING: {
-                                if(j_setting.contains("value.encrypted")) {
-                                    const auto& encrypted = j_setting["value.encrypted"].get<std::string>();                                    
-                                    setting.string_value = crypto::decodeValue(encrypted); 
-                                    setting.encrypted = true;
-                                } else {                        
-                                    setting.string_value = j_setting["value"].get<std::string>(); 
+                                setting.encrypted = j_setting["encrypted"].get<bool>();
+                                const auto& val = j_setting["value"].get<std::string>();
+                                if(setting.encrypted) {
+                                    const auto& decrypted = crypto::decodeValue(val);
+                                    setting.string_value = decrypted;
+                                } else {
+                                    setting.string_value = val;
                                 }
                                 break;
                             }
@@ -563,19 +564,19 @@ namespace alefbet::pctrl::database {
                 { "key", value.key }
             });
             
-            std::string valueKey = "value" +std::string((value.encrypted ? ".encrypted" : ""));
+            std::string valueKey = "value";
 
             switch(value.type) {
                 case INTEGER: j_entry[valueKey] = value.int_value; break;
-                case DOUBLE: j_entry[valueKey] = std::to_string(value.double_value); break;                    
+                case DOUBLE: j_entry[valueKey] = std::to_string(value.double_value); break;
                 case STRING: {
                     if(value.encrypted) {
-                        const auto& encoded = crypto::encodeValue(value.string_value);
-                        j_entry[valueKey] = encoded; 
+                        const auto& encrypted = crypto::encodeValue(value.string_value);
+                        j_entry[valueKey] = encrypted;
+                        j_entry["encrypted"] = true;
                     } else {
-                        j_entry[valueKey] = value.string_value; 
+                        j_entry[valueKey] = value.string_value;
                     }
-
                     break;
                 }
                 default: j_entry[valueKey] = "";
@@ -611,7 +612,7 @@ namespace alefbet::pctrl::database {
             logError("[Database] The settings file could not be opened for writing\n");
             return;
         } else {
-            logDebug("[Database] Settings file successfully opened\n");
+            logDebug("[Database] Settings file successfully opened for writing\n");
         }
 
         const auto data = j_settings.dump();
