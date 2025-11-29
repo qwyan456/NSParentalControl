@@ -518,6 +518,7 @@ namespace alefbet::pctrl::database {
                                 if(j_setting.contains("value.encrypted")) {
                                     const auto& encrypted = j_setting["value.encrypted"].get<std::string>();                                    
                                     setting.string_value = crypto::decodeValue(encrypted); 
+                                    setting.encrypted = true;
                                 } else {                        
                                     setting.string_value = j_setting["value"].get<std::string>(); 
                                 }
