@@ -71,7 +71,7 @@ namespace alefbet::pctrl::helpers {
             user.nickname = UserNickname("ERR#005");
             return user;
         } else {
-            logError("[Helpers] accountGetProfile() ok\n");
+            logDebug("[Helpers] accountGetProfile() ok\n");
         }
 
         rc = accountProfileGet(&profile, &user_data, &base);
@@ -82,7 +82,7 @@ namespace alefbet::pctrl::helpers {
             user.nickname = UserNickname("ERR#006");
             return user;
         } else {
-            logError("[Helpers] accountProfileGet() ok\n");
+            logDebug("[Helpers] accountProfileGet() ok\n");
         }
         
         user.uid = uid;

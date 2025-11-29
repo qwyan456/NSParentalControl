@@ -16,7 +16,6 @@ When there are warnings they are shown at the top of the list:
 ⓘ Database need upgrade! ---> Means that the database format has changed and you have to change a value in the admin section to upgrade it (for example reset your PIN to the same value).
 ```
 
-
 Then when no game has been started, the menu shows:
 
 ```

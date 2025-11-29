@@ -5,7 +5,7 @@
 #include "literals.h"
 #include "utils.h"
 
-constexpr const char* LogFilename = "/atmosphere/logs/pctrl_svc.log";
+constexpr const char* LogFilename = "/config/parental_control/sysmodule.log";
 
 namespace alefbet {
     namespace pctrl {

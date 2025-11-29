@@ -4,7 +4,7 @@
 #include <cassert>
 #include <switch.h>
 
-constexpr const char* LogFilename = "/switch/pctrl_ovl.log";
+constexpr const char* LogFilename = "/config/parental_control/overlay.log";
 
 namespace alefbet {
     namespace pctrl {
