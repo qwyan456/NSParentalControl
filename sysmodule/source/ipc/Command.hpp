@@ -55,6 +55,8 @@ namespace Ipc {
             case Command::SetDailyLimit: return "SetDailyLimit";
             case Command::SetLogLevel: return "SetLogLevel";
             case Command::GetLogLevel: return "GetLogLevel";
+            case Command::IsTampered: return "IsTampered";
+            case Command::MustUpgradeDatabase: return "MustUpgradeDatabase";
             default: return "Unknown";
         }
     };

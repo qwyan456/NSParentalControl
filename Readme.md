@@ -1,14 +1,24 @@
 # NS Parental Control
 
+[![platform](https://img.shields.io/badge/platform-Switch-898c8c?logo=C++.svg)](https://gbatemp.net/forums/nintendo-switch.283/?prefix_id=44)
+[![language](https://img.shields.io/badge/language-C++-ba1632?logo=C++.svg)](https://github.com/topics/cpp)
+[![GPLv3 License](https://img.shields.io/badge/license-GPLv3-189c11.svg)](https://www.gnu.org/licenses/old-licenses/gpl-3.0.en.html)
+[![Latest Version](https://img.shields.io/github/v/release/TristanIsrael/NSParentalControl?label=latest&color=blue)](https://github.com/TristanIsrael/NSParentalControl/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/TristanIsrael/NSParentalControl/total?color=6f42c1)](https://github.com/TristanIsrael/NSParentalControl/graphs/traffic)
+[![GitHub issues](https://img.shields.io/github/issues/TristanIsrael/NSParentalControl?color=222222)](https://github.com/TristanIsrael/NSParentalControl/issues)
+[![GitHub stars](https://img.shields.io/github/stars/TristanIsrael/NSParentalControl)](https://github.com/TristanIsrael/NSParentalControl/stargazers)
+
 NS Parental Control is a simple parental control system for the Nintendo Switch which does not require Internet access or a smartphone to operate.
 
 It can be used freely.
 
 The user manual can be found [here](docs/manual.md).
 
-## Current version
+## Dependencies
 
-[1.2](https://github.com/TristanIsrael/NSParentalControl/releases/latest)
+Linked with:
+- libnx 4.10.0 
+- libultrahand 2.2.0
 
 ## Table of Contents
 

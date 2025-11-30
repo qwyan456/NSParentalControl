@@ -294,14 +294,19 @@ namespace alefbet::pctrl::database {
 
             logDebug("[Database] Sessions data: %s\n", data);
             logDebug("[Database] Parse sessions file\n");
-            json j_settings = json::parse(data);
+            json j_data = json::parse(data);
 
-            if(!j_settings.contains("hash")) {
-                logInfo("[Database] The database should be upgraded.\n");
-                mustUpgrade_ = true;
-            }
+            // Verify database integrity
+            logInfo("[Database] Verifying database integrity\n");
+            if(j_data.contains("hash")) {                                
+                isTampered_ = !crypto::verifyHash(j_data);                
+                logInfo("[Database] Database file integrity is %s. %s\n", (!isTampered_ ? "verified" : "compromized"), isTampered_ ? "The hash is corrupted." : "");
+            } else {
+                isTampered_ = true;
+                logInfo("[Database] Database file integrity is compromized. The hash is missing\n");
+            }            
 
-            std::vector<json> j_entries = j_settings["history"].get<std::vector<json>>();
+            std::vector<json> j_entries = j_data["history"].get<std::vector<json>>();            
 
             for(const auto& j_entry: j_entries) {
                 auto uidAsString = j_entry["uid"].get<std::string>();
@@ -341,6 +346,12 @@ namespace alefbet::pctrl::database {
         json j_history = json{
             { "history", j_entries }
         };
+
+        // Calculate data hash
+        const auto& hash = crypto::calculateHash(j_history);
+
+        // Add the hash
+        j_history["hash"] = hash;
 
         if(R_FAILED(fsFsDeleteFile(&sdmc_, DB_FILENAME))) {
             logError("[Database] Could not delete the current database file\n");            
@@ -421,13 +432,13 @@ namespace alefbet::pctrl::database {
         return result;
     }
 
-    Settings loadSettings() {
+    Settings& loadSettings() {
         // We load the file only when the settings are not synchronized
         if(settings_synchronized_) return settings_;
 
         logDebug("[Database] Loading settings at %s\n", SETTINGS_FILENAME);
 
-        if(!prepare()) return Settings{};
+        if(!prepare()) return settings_;
 
         bool opened = R_SUCCEEDED(fsFsOpenFile(&sdmc_, SETTINGS_FILENAME, FsOpenMode_Read, &handle_settings_));
 
@@ -444,13 +455,13 @@ namespace alefbet::pctrl::database {
                 }
             }
 
-            saveSetting(settings_, Setting {
+            saveSetting(Setting {
                 .key = SETTING_DAILY_LIMIT_GAME,
                 .type = INTEGER,
                 .int_value = 1*60 //Default: 1 hour
             });
                         
-            saveSetting(settings_, Setting {
+            saveSetting(Setting {
                 .key = SETTING_DAILY_LIMIT_GLOBAL,
                 .type = INTEGER,
                 .int_value = 1*60 //Default: 1 hour
@@ -500,7 +511,7 @@ namespace alefbet::pctrl::database {
                 
                 isTampered_ = !crypto::verifyHash(j_settings);
 
-                logInfo("[Database] Settings file integrity is %s\n", (!isTampered_ ? "verified" : "compromized"));
+                logInfo("[Database] The settings file integrity is %s\n", (!isTampered_ ? "verified" : "compromized"));
             }
 
             if(j_settings.contains("settings")) {
@@ -542,13 +553,13 @@ namespace alefbet::pctrl::database {
         return settings_;
     }
 
-    void saveSetting(Settings& settings, Setting setting) {        
+    void saveSetting(Setting setting) {        
         //Update settings internal structure
-        settings[setting.key] = setting;  
-        saveSettings(settings);      
+        settings_[setting.key] = setting;  
+        saveSettings();      
     }
     
-    void saveSettings(Settings& settings) {
+    void saveSettings() {
         logDebug("[Database] Saving settings\n");
         std::lock_guard<std::mutex> lock(mutex_settings_);        
 
@@ -557,7 +568,7 @@ namespace alefbet::pctrl::database {
         //Update database file
         json j_entries;
         
-        auto&& values = settings | std::views::values;
+        auto&& values = settings_ | std::views::values;
         for(const auto& value : values) {
             json j_entry = json::object( {
                 { "type", value.type },

@@ -255,7 +255,7 @@ namespace alefbet::pctrl::srv {
             .int_value = limit_in_minutes
         };
 
-        saveSetting(settings, setting);
+        saveSetting(setting);
 
         return Ipc::Result::Ok;
     }
@@ -293,7 +293,7 @@ namespace alefbet::pctrl::srv {
             .encrypted = true
         };
 
-        saveSetting(settings, settingPin);
+        saveSetting(settingPin);
 
         return Ipc::Result::Ok;        
     }
@@ -349,7 +349,7 @@ namespace alefbet::pctrl::srv {
             .int_value = (u64)workingMode
         };
 
-        saveSetting(settings, setting);
+        saveSetting(setting);
 
         return Ipc::Result::Ok;
     }
@@ -383,7 +383,7 @@ namespace alefbet::pctrl::srv {
             .int_value = showRemainingTime ? (u64)1 : (u64)0
         };
 
-        saveSetting(settings, setting);
+        saveSetting(setting);
 
         // DISABLED temporarily
         /*if(showRemainingTime) {
@@ -433,7 +433,7 @@ namespace alefbet::pctrl::srv {
             .int_value = isEnabled ? (u64)1 : (u64)0
         };
 
-        saveSetting(settings, setting);
+        saveSetting(setting);
         enabled_ = isEnabled;
 
         if(enabled_) {
@@ -477,7 +477,7 @@ namespace alefbet::pctrl::srv {
             .int_value = limit
         };
 
-        saveSetting(settings, setting);
+        saveSetting(setting);
         logDebug("[Service] Daily limit is set to %i minutes\n", limit);
 
         return Ipc::Result::Ok;
@@ -508,7 +508,7 @@ namespace alefbet::pctrl::srv {
             .int_value = level
         };
 
-        saveSetting(settings, setting);
+        saveSetting(setting);
         
         logger::setLogLevel(static_cast<LogLevel>(level));
         //logInfo("[Service] Log level set to %i\n", level);        

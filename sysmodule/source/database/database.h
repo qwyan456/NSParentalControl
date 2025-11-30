@@ -18,9 +18,9 @@ namespace alefbet::pctrl::database {
     HistoryEntry addToHistory(AccountUid uid, u64 titleId, u16 duration_in_minutes);
 
     /* Settings management */
-    Settings loadSettings();
-    void saveSettings(Settings& settings);
-    void saveSetting(Settings& settings, Setting setting);
+    Settings& loadSettings();
+    void saveSettings();
+    void saveSetting(Setting setting);
 
     bool upgradeNeeded();
     bool isTampered();
