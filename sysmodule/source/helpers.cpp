@@ -316,4 +316,31 @@ namespace alefbet::pctrl::helpers {
 
         return true;
     }
+
+    bool terminateCurrentApplication() {
+        logInfo("[Helpers] Trying to terminate the current title\n");
+
+        //Get the current title
+        u64 pid = getRunningApplicationPid();
+        if(pid > 0) {
+            u64 titleId = getRunningApplicationTitleId(pid);
+            if(titleId > 0) {
+                pmshellInitialize();
+                if(R_FAILED(pmshellTerminateProgram(titleId))) {
+                    logError("[Helpers] Could not terminate the title with titleId %s\n", titleIdToString(titleId).c_str());
+                    pmshellExit();
+                    return false;
+                }
+                pmshellExit();
+            } else {
+                logDebug("[Helpers] No title id found for PID %llu\n", pid);
+                return false;
+            }
+        } else {
+            logDebug("[Helpers] No PID found (No running app?)\n");
+            return false;
+        }
+
+        return true;
+    }
 }

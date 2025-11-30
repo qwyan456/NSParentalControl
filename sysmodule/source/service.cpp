@@ -561,7 +561,8 @@ namespace alefbet::pctrl::srv {
                 Thread t;
                 threadCreate(&t, delayedTimeout, this, NULL, 0x4000, 0x2c, -2);
                 threadStart(&t);*/                
-                NotificationsController::notifyRemainingTime(15);
+                //NotificationsController::notifyRemainingTime(15);
+                helpers::terminateCurrentApplication();
 
                 break;
             }

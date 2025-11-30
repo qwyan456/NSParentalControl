@@ -35,5 +35,7 @@ namespace alefbet::pctrl {
 
         //bool shutdown();
         bool rebootToPayload();
+
+        bool terminateCurrentApplication();
     }
 }   
