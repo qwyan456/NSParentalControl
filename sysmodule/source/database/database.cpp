@@ -7,10 +7,15 @@
 #include <switch.h>
 #include <filesystem>
 #include <mutex>
+#include <vector>
+#include <algorithm>
+#include <mbedtls/sha512.h>
+#include <iomanip>
 #include "database.h"
 #include "json.hpp"
 #include "../logger.h"
 #include "../helpers.h"
+//#include "aes.hpp"
 
 using json = nlohmann::json;
 using namespace alefbet::pctrl::logger;
@@ -21,101 +26,287 @@ static const char* DB_FILENAME = "/config/parental_control/sessions.json";
 static const char* SETTINGS_FILENAME = "/config/parental_control/settings.json";
 
 namespace alefbet::pctrl::database {
-    static FsFileSystem sdmc;
-    static FsFile handle_settings;
-    static std::mutex mutex_settings;
-    static FsFile handle_database;
-    static std::mutex mutex_database;
-    static bool ready = false;
+    static FsFileSystem sdmc_;
+    static FsFile handle_settings_;
+    static std::mutex mutex_settings_;
+    static FsFile handle_database_;
+    static std::mutex mutex_database_;
+    static bool ready_ = false;
+    static bool data_synchronized_ = false; // The data are synchronized between the cache and the file
+    static bool settings_synchronized_ = false; 
+    static History history_;
+    static Settings settings_;
+    static bool mustUpgrade_ = false;
+    static bool isTampered_ = false;
 
-    bool prepare() {
-        if(ready) return true;
+    namespace crypto {
+        /*static struct AES_ctx aes_ctx;
 
-        ready = R_SUCCEEDED(fsOpenSdCardFileSystem(&sdmc));
-        if(!ready) {
-            logToFile("[Database] Could not get access to SD card\n");
+        void initCrypto() {
+            Result rc = splInitialize();
+            if(R_FAILED(rc)) {
+                logError("[Database] Could not connect to spl service\n");
+                return;
+            }
+
+            // Get the device ID            
+            u64 deviceId = 0;
+            splGetConfig(SplConfigItem_DeviceId, &deviceId);
+            if(R_FAILED(rc)) {
+                logError("[Database] Failed to get Device ID for ciphering\n");
+                return;
+            }
+
+            // Derivate a hash
+            u8 hash[32] = {0};
+            sha256CalculateHash(hash, (u8*)&deviceId, sizeof(deviceId));
+
+            // Create a 128 bit key
+            u8 cipher_key[16];
+            memcpy(cipher_key, hash, 16);
+
+            // Initialize AES context
+            AES_init_ctx(&aes_ctx, cipher_key);            
+            
+            splExit();
+            cipher_ready = true;
         }
 
-        return ready;
+        void encryptBuffer(u8* buffer, u64 size) {
+            AES_CBC_encrypt_buffer(&aes_ctx, buffer, size);
+        }
+
+        void decryptBuffer(u8* buffer, u64 size) {
+            AES_CBC_decrypt_buffer(&aes_ctx, buffer, size);
+        }*/
+
+        static const char b64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+        std::string base64Encode(const std::vector<uint8_t>& data)
+        {
+            std::string out;
+            uint32_t val = 0;
+            int valb = -6;
+
+            for (uint8_t c : data) {
+                val = (val << 8) + c;
+                valb += 8;
+                while (valb >= 0) {
+                    out.push_back(b64_table[(val >> valb) & 0x3F]);
+                    valb -= 6;
+                }
+            }
+            if (valb > -6) out.push_back(b64_table[((val << 8) >> (valb + 8)) & 0x3F]);
+            while (out.size() % 4) out.push_back('=');
+
+            return out;
+        }
+
+        std::vector<uint8_t> base64Decode(const std::string& s)
+        {
+            std::vector<int> T(256, -1);
+            for (int i = 0; i < 64; i++) T[b64_table[i]] = i;
+
+            std::vector<uint8_t> out;
+            uint32_t val = 0;
+            int valb = -8;
+
+            for (uint8_t c : s) {
+                if (T[c] == -1) break;
+                val = (val << 6) + T[c];
+                valb += 6;
+                if (valb >= 0) {
+                    out.push_back((val >> valb) & 0xFF);
+                    valb -= 8;
+                }
+            }
+            return out;
+        }
+
+        void xorAndPermute(std::vector<uint8_t>& data, uint8_t key) {
+            for (auto& b : data)
+                b ^= key;
+
+            for (size_t i = 0; i + 3 < data.size(); i += 4) {
+                std::swap(data[i],   data[i+2]);
+                std::swap(data[i+1], data[i+3]);
+            }
+        }
+
+        void unpermuteAndXor(std::vector<uint8_t>& data, uint8_t key) {
+            for (size_t i = 0; i + 3 < data.size(); i += 4) {
+                std::swap(data[i],   data[i+2]);
+                std::swap(data[i+1], data[i+3]);
+            }
+
+            for (auto& b : data)
+                b ^= key;
+        }
+
+        std::string encodeValue(const std::string input) {
+            std::vector<u8> buf(input.begin(), input.end());
+            u8 key = 0x31;
+
+            xorAndPermute(buf, key);
+            return std::string(buf.begin(), buf.end());
+        }
+
+        std::string decodeValue(const std::string input) {
+            std::vector<u8> buf(input.begin(), input.end());
+            u8 key = 0x31;
+
+            unpermuteAndXor(buf, key);
+            return std::string(buf.begin(), buf.end());
+        }
+
+        std::string calculateHash(const json& j_entries) {
+            mbedtls_sha512_context ctx;
+
+            const auto& str_data = j_entries.dump();
+            u8 hash[64];
+
+            mbedtls_sha512_init(&ctx);
+            mbedtls_sha512_starts_ret(&ctx, 0); // 0 = SHA-512
+            mbedtls_sha512_update_ret(&ctx, reinterpret_cast<const u8*>(str_data.data()), str_data.size());
+            mbedtls_sha512_finish_ret(&ctx, hash);
+            mbedtls_sha512_free(&ctx);
+
+            std::ostringstream oss;
+            for(int i = 0 ; i < 64 ; i++) {
+                oss << std::hex << std::setw(2) << std::setfill('0') << (int)hash[i];
+            }
+
+            return oss.str();
+        }
+
+        bool verifyHash(const json& j_entries) {
+            // The hash is calculated without the "hash" entry
+            const auto& hash = j_entries["hash"].get<std::string>();
+            auto j_copy = j_entries; // Copy JSON data
+            j_copy.erase("hash");
+
+            const auto& calculated_hash = calculateHash(j_copy);
+
+            return calculated_hash == hash;
+        }
+    }
+
+    bool upgradeNeeded() {
+        return mustUpgrade_;
+    }
+
+    bool isTampered() {
+        return isTampered_;
+    }
+
+    bool prepare() {
+        if(ready_) return true;
+
+        ready_ = R_SUCCEEDED(fsOpenSdCardFileSystem(&sdmc_));
+        if(!ready_) {
+            logError("[Database] Could not get access to SD card\n");
+        }
+
+        return ready_;
+    }
+
+    void freeFs() {
+        if(!ready_) return;
+
+        fsFsClose(&sdmc_);
     }
 
     bool createDataDirectory() 
     {
         if(!prepare()) return false;
 
-        bool result = R_SUCCEEDED(fsFsCreateDirectory(&sdmc, DATA_DIR));
+        bool result = R_SUCCEEDED(fsFsCreateDirectory(&sdmc_, DATA_DIR));
 
         return result;
     }
 
-    History loadDatabase()
-    {            
-        std::lock_guard<std::mutex> lock(mutex_database);
+    void loadDatabase()
+    {   
+        // We load the file only when the data are not up to date                 
+        if(data_synchronized_) return;
 
-        logToFile("[Database] Loading database at %s\n", DB_FILENAME);
+        std::lock_guard<std::mutex> lock(mutex_database_);
 
-        if(!prepare()) return History{};
+        logDebug("[Database] Loading database at %s\n", DB_FILENAME);
 
-        bool opened = R_SUCCEEDED(fsFsOpenFile(&sdmc, DB_FILENAME, FsOpenMode_Read, &handle_database));
+        if(!prepare()) return;
+
+        bool opened = R_SUCCEEDED(fsFsOpenFile(&sdmc_, DB_FILENAME, FsOpenMode_Read, &handle_database_));
         History history;
 
         if(!opened) {
-            logToFile("Could not open database file. Try to create a new file.\n");
+            logError("Could not open database file. Try to create a new file.\n");
 
             // Verify whether data directory exists
             FsDirEntryType type;
-            if(R_FAILED(fsFsGetEntryType(&sdmc, DATA_DIR, &type))) {
+            if(R_FAILED(fsFsGetEntryType(&sdmc_, DATA_DIR, &type))) {
                 // The directory does not exist
                 if(!createDataDirectory()) {
-                    logToFile("[Database] The data directory could not be created.\n");
-                    return history;
+                    logError("[Database] The data directory could not be created.\n");
+                    return;
                 }
             }
 
-            if(R_FAILED(fsFsCreateFile(&sdmc, DB_FILENAME, 0, 0))) {
-                logToFile("[Database] Could not create a new database file.\n");
-                return history;
+            if(R_FAILED(fsFsCreateFile(&sdmc_, DB_FILENAME, 0, 0))) {
+                logError("[Database] Could not create a new database file.\n");
+                return;
             }
         } else {
             s64 fileSize = 0;
-            if(R_FAILED(fsFileGetSize(&handle_database, &fileSize))) {
-                logToFile("[Database] Could not get database file size\n");
-                fsFileClose(&handle_database);
-                return history;
+            if(R_FAILED(fsFileGetSize(&handle_database_, &fileSize))) {
+                logError("[Database] Could not get database file size\n");
+                fsFileClose(&handle_database_);
+                return ;
             } else {
-                logToFile("[Database] Database file size is %i\n", fileSize);
+                logDebug("[Database] Database file size is %i\n", fileSize);
             }
 
             if(fileSize == 0) {
-                logToFile("[Database] Database file is empty\n");
-                fsFileClose(&handle_database);
-                return history;
+                logError("[Database] Database file is empty\n");
+                fsFileClose(&handle_database_);
+                return;
             }
 
-            u8* data_sessions = new u8[fileSize+1];            
-            if(data_sessions == nullptr) {
-                logToFile("[Database] Could not create a buffer for sessions\n");
-                fsFileClose(&handle_database);
-                return history;
+            u8* data = new u8[fileSize+1];            
+            if(data == nullptr) {
+                logError("[Database] Could not create a buffer for sessions\n");
+                fsFileClose(&handle_database_);
+                return;
             } else {
-                logToFile("[Database] sessions buffer ready at @%p\n", (void*)data_sessions);
+                logDebug("[Database] sessions buffer ready at @%p\n", (void*)data);
             }
 
             u64 dataRead = 0;
-            if(R_FAILED(fsFileRead(&handle_database, 0, data_sessions, fileSize, FsReadOption_None, &dataRead))) {
-                logToFile("[Database] Could not read the database file\n");
-                fsFileClose(&handle_database);
-                return history;
+            if(R_FAILED(fsFileRead(&handle_database_, 0, data, fileSize, FsReadOption_None, &dataRead))) {
+                logError("[Database] Could not read the database file\n");
+                fsFileClose(&handle_database_);
+                return;
             } else {
-                logToFile("[Database] Sessions database read\n");
+                logDebug("[Database] Sessions database read\n");
             }
 
-            data_sessions[fileSize] = '\0';
-            logToFile("[Database] Sessions data: %s\n", data_sessions);
-            logToFile("[Database] Parse sessions file\n");
-            json j_settings = json::parse(data_sessions);
+            data[fileSize] = '\0';                
 
-            std::vector<json> j_entries = j_settings["history"].get<std::vector<json>>();
+            logDebug("[Database] Sessions data: %s\n", data);
+            logDebug("[Database] Parse sessions file\n");
+            json j_data = json::parse(data);
+
+            // Verify database integrity
+            logInfo("[Database] Verifying database integrity\n");
+            if(j_data.contains("hash")) {                                
+                isTampered_ = !crypto::verifyHash(j_data);                
+                logInfo("[Database] Database file integrity is %s. %s\n", (!isTampered_ ? "verified" : "compromized"), isTampered_ ? "The hash is corrupted." : "");
+            } else {
+                isTampered_ = true;
+                logInfo("[Database] Database file integrity is compromized. The hash is missing\n");
+            }            
+
+            std::vector<json> j_entries = j_data["history"].get<std::vector<json>>();            
 
             for(const auto& j_entry: j_entries) {
                 auto uidAsString = j_entry["uid"].get<std::string>();
@@ -128,15 +319,15 @@ namespace alefbet::pctrl::database {
                 history.addEntry(entry);
             }
 
-            fsFileClose(&handle_database);
-            delete[] data_sessions;
+            fsFileClose(&handle_database_);
+            delete[] data;
         }
 
-        return history;
+        data_synchronized_ = true;
     }
 
-    void saveDatabase(const History& history) {       
-        std::lock_guard<std::mutex> lock(mutex_database);
+    void saveDatabase(const History& history) {
+        std::lock_guard<std::mutex> lock(mutex_database_);
 
         if(!prepare()) return;
 
@@ -156,38 +347,49 @@ namespace alefbet::pctrl::database {
             { "history", j_entries }
         };
 
-        if(R_FAILED(fsFsDeleteFile(&sdmc, DB_FILENAME))) {
-            logToFile("[Database] Could not delete the current database file\n");            
+        // Calculate data hash
+        const auto& hash = crypto::calculateHash(j_history);
+
+        // Add the hash
+        j_history["hash"] = hash;
+
+        if(R_FAILED(fsFsDeleteFile(&sdmc_, DB_FILENAME))) {
+            logError("[Database] Could not delete the current database file\n");            
         }
 
-        if(R_FAILED(fsFsCreateFile(&sdmc, DB_FILENAME, 0, 0))) {
-            logToFile("[Database] Could not create the database file\n");
+        if(R_FAILED(fsFsCreateFile(&sdmc_, DB_FILENAME, 0, 0))) {
+            logError("[Database] Could not create the database file\n");
             return;
         } else {
-            logToFile("[Database] New database file created\n");
+            logInfo("[Database] New database file created\n");
         }
 
-        if(R_FAILED(fsFsOpenFile(&sdmc, DB_FILENAME, FsOpenMode_Write | FsOpenMode_Append, &handle_database))) {
-            logToFile("[Database] The database file could not be opened for writing\n");
+        if(R_FAILED(fsFsOpenFile(&sdmc_, DB_FILENAME, FsOpenMode_Write | FsOpenMode_Append, &handle_database_))) {
+            logError("[Database] The database file could not be opened for writing\n");
             return;
         }
 
-        const auto data = j_history.dump();
-        const auto s_data = data.c_str();
+        const auto stdstr_data = j_history.dump();
+        const auto str_data = stdstr_data.c_str();
+        u64 lenstr = std::strlen(str_data);
+        void* s_data = malloc(lenstr+1);
+        memset(s_data, 0, lenstr);
+        memcpy(s_data, str_data, lenstr);
 
-        logToFile("[Database] Writing sessions data %s (size=%i)\n", s_data, std::strlen(s_data));    
-        if(R_FAILED(fsFileWrite(&handle_database, 0, s_data, std::strlen(s_data), FsWriteOption_Flush))) {
-            logToFile("[Database] Could not write into database file\n");
+        logDebug("[Database] Writing sessions data %s (size=%i)\n", s_data, lenstr);    
+
+        if(R_FAILED(fsFileWrite(&handle_database_, 0, s_data, lenstr, FsWriteOption_Flush))) {
+            logError("[Database] Could not write into database file\n");
         }
 
-        fsFileClose(&handle_database);
+        fsFileClose(&handle_database_);
     }    
 
     std::vector<HistoryEntry> getHistory(AccountUid uid, std::string date) {
         //Get current history
-        History history = loadDatabase();
+        loadDatabase();
 
-        return history.entries(uid, date);
+        return history_.entries(uid, date);
     }
 
     HistoryEntry addToHistory(AccountUid uid, u64 titleId, u16 duration_in_minutes) 
@@ -195,14 +397,14 @@ namespace alefbet::pctrl::database {
         HistoryEntry result;
 
         if(uid.uid[0] == 0 || uid.uid[1] == 0 || titleId == 0) {
-            logToFile("[Database] Wrong parameters\n");
+            logError("[Database] Wrong parameters\n");
             return result;
         }
 
         std::string uidToString = accountUidToString(uid);
 
         //Get current history
-        History history = loadDatabase();
+        loadDatabase();
 
         const auto& date = today();
         if(date.empty()) {
@@ -210,96 +412,107 @@ namespace alefbet::pctrl::database {
         }
 
         //Search existing entry
-        auto entries = history.entries(uid, date, titleId);
+        auto entries = history_.entries(uid, date, titleId);
 
         if(!entries.empty()) {
             auto entry = entries[0];
-            logToFile("[Database] entry found for user %s with title ID %i\n", uidToString.c_str(), titleId);
+            logDebug("[Database] entry found for user %s with title ID %i\n", uidToString.c_str(), titleId);
             entry.setDurationInMinutes(duration_in_minutes + entry.durationInMinutes());
-            logToFile("[Database] new duration is %i\n", entry.durationInMinutes());
+            logDebug("[Database] new duration is %i\n", entry.durationInMinutes());
             result = entry;
         } else {
             //Or create a new one
-            logToFile("[Database] no entry found for user %s with title ID %i\n", uidToString.c_str(), titleId);
+            logDebug("[Database] no entry found for user %s with title ID %i\n", uidToString.c_str(), titleId);
             HistoryEntry entry = HistoryEntry(uid, date, titleId, duration_in_minutes);
-            history.addEntry(entry);
+            history_.addEntry(entry);
             result = entry;
         }
 
-        saveDatabase(history);
+        saveDatabase(history_);
         return result;
     }
 
-    Settings loadSettings() {
-        logToFile("[Database] Loading settings at %s\n", SETTINGS_FILENAME);
+    Settings& loadSettings() {
+        // We load the file only when the settings are not synchronized
+        if(settings_synchronized_) return settings_;
 
-        if(!prepare()) return Settings{};
+        logDebug("[Database] Loading settings at %s\n", SETTINGS_FILENAME);
 
-        bool opened = R_SUCCEEDED(fsFsOpenFile(&sdmc, SETTINGS_FILENAME, FsOpenMode_Read, &handle_settings));
-        Settings settings;
+        if(!prepare()) return settings_;
+
+        bool opened = R_SUCCEEDED(fsFsOpenFile(&sdmc_, SETTINGS_FILENAME, FsOpenMode_Read, &handle_settings_));
 
         if(!opened) {
-            logToFile("Could not open settings file. Initialise default settings.\n");
+            logError("Could not open settings file. Initialise default settings.\n");
 
             // Verify whether data directory exists
             FsDirEntryType type;
-            if(R_FAILED(fsFsGetEntryType(&sdmc, DATA_DIR, &type))) {
+            if(R_FAILED(fsFsGetEntryType(&sdmc_, DATA_DIR, &type))) {
                 // The directory does not exist
                 if(!createDataDirectory()) {
-                    logToFile("[Database] The data directory could not be created.\n");
-                    return settings;
+                    logError("[Database] The data directory could not be created.\n");
+                    return settings_;
                 }
             }
 
-            saveSetting(settings, Setting {
+            saveSetting(Setting {
                 .key = SETTING_DAILY_LIMIT_GAME,
                 .type = INTEGER,
                 .int_value = 1*60 //Default: 1 hour
             });
                         
-            saveSetting(settings, Setting {
+            saveSetting(Setting {
                 .key = SETTING_DAILY_LIMIT_GLOBAL,
                 .type = INTEGER,
                 .int_value = 1*60 //Default: 1 hour
             });
         } else {
             s64 fileSize = 0;
-            if(R_FAILED(fsFileGetSize(&handle_settings, &fileSize))) {
-                logToFile("[Database] Could not get settings file size\n");
-                fsFileClose(&handle_settings);
-                return settings;
+            if(R_FAILED(fsFileGetSize(&handle_settings_, &fileSize))) {
+                logError("[Database] Could not get settings file size\n");
+                fsFileClose(&handle_settings_);
+                return settings_;
             } else {
-                logToFile("[Database] Settings file size is %i\n", fileSize);
+                logDebug("[Database] Settings file size is %i\n", fileSize);
             }
 
             if(fileSize == 0) {
-                logToFile("[Database] Settings file is empty\n");
-                fsFileClose(&handle_settings);
-                return settings;
+                logError("[Database] Settings file is empty\n");
+                fsFileClose(&handle_settings_);
+                return settings_;
             }
 
             u8* data_settings = new u8[fileSize+1];            
             if(data_settings == nullptr) {
-                logToFile("[Database] Could not create a buffer for settings\n");
-                fsFileClose(&handle_settings);
-                return settings;
+                logError("[Database] Could not create a buffer for settings\n");
+                fsFileClose(&handle_settings_);
+                return settings_;
             } else {
-                logToFile("[Database] settings buffer ready at @%p\n", (void*)data_settings);
+                logDebug("[Database] settings buffer ready at @%p\n", (void*)data_settings);
             }
 
             u64 dataRead = 0;
-            if(R_FAILED(fsFileRead(&handle_settings, 0, data_settings, fileSize, FsReadOption_None, &dataRead))) {
-                logToFile("[Database] Could not read the settings file\n");
-                fsFileClose(&handle_settings);
-                return settings;
+            if(R_FAILED(fsFileRead(&handle_settings_, 0, data_settings, fileSize, FsReadOption_None, &dataRead))) {
+                logError("[Database] Could not read the settings file\n");
+                fsFileClose(&handle_settings_);
+                return settings_;
             } else {
-                logToFile("[Database] Settings database read\n");
+                logDebug("[Database] Settings database read\n");
             }
 
             data_settings[fileSize] = '\0';
-            //logToFile("[Database] Settings data: %s\n", data_settings);
-            logToFile("[Database] Parse settings file\n");
+
+            //logDebug("[Database] Settings data: %s\n", data_settings);
+            logDebug("[Database] Parse settings file\n");
             json j_settings = json::parse(data_settings);
+
+            if(j_settings.contains("hash")) {
+                logInfo("[Database] Verifying settings integrity\n");
+                
+                isTampered_ = !crypto::verifyHash(j_settings);
+
+                logInfo("[Database] The settings file integrity is %s\n", (!isTampered_ ? "verified" : "compromized"));
+            }
 
             if(j_settings.contains("settings")) {
                 for(const auto& j_setting: j_settings["settings"]) {
@@ -308,93 +521,120 @@ namespace alefbet::pctrl::database {
 
                         setting.key = j_setting["key"].get<std::string>();
                         setting.type = j_setting["type"].get<SettingType>();
-
+                        
                         switch(setting.type) {
                             case INTEGER: setting.int_value = j_setting["value"].get<u64>(); break;
                             case DOUBLE: setting.double_value = j_setting["value"].get<double>(); break;
-                            case STRING: setting.string_value = j_setting["value"].get<std::string>(); break;
+                            case STRING: {
+                                setting.encrypted = j_setting["encrypted"].get<bool>();
+                                const auto& val = j_setting["value"].get<std::string>();
+                                if(setting.encrypted) {
+                                    const auto& decrypted = crypto::decodeValue(val);
+                                    setting.string_value = decrypted;
+                                } else {
+                                    setting.string_value = val;
+                                }
+                                break;
+                            }
                         }
 
-                        settings[setting.key] = setting;
+                        settings_[setting.key] = setting;
                     } else {
-                        logToFile("[Database] setting is malformed\n");
+                        logError("[Database] setting is malformed\n");
                     }
                 }
             }
 
-            fsFileClose(&handle_settings);
+            fsFileClose(&handle_settings_);
             delete[] data_settings;
+            settings_synchronized_ = true;
         }
-
-        return settings;
+        
+        return settings_;
     }
 
-    void saveSetting(Settings& settings, Setting setting) {
+    void saveSetting(Setting setting) {        
         //Update settings internal structure
-        settings[setting.key] = setting;  
-        saveSettings(settings);      
+        settings_[setting.key] = setting;  
+        saveSettings();      
     }
     
-    void saveSettings(Settings& settings) {
-        logToFile("[Database] Saving settings\n");
-        std::lock_guard<std::mutex> lock(mutex_settings);        
+    void saveSettings() {
+        logDebug("[Database] Saving settings\n");
+        std::lock_guard<std::mutex> lock(mutex_settings_);        
 
         if(!prepare()) return;
 
         //Update database file
         json j_entries;
         
-        auto&& values = settings | std::views::values;
+        auto&& values = settings_ | std::views::values;
         for(const auto& value : values) {
             json j_entry = json::object( {
                 { "type", value.type },
                 { "key", value.key }
             });
             
+            std::string valueKey = "value";
+
             switch(value.type) {
-                case INTEGER: j_entry["value"] = value.int_value; break;
-                case DOUBLE: j_entry["value"] = std::to_string(value.double_value); break;
-                case STRING: j_entry["value"] = value.string_value; break;            
-                default: j_entry["value"] = "";
+                case INTEGER: j_entry[valueKey] = value.int_value; break;
+                case DOUBLE: j_entry[valueKey] = std::to_string(value.double_value); break;
+                case STRING: {
+                    if(value.encrypted) {
+                        const auto& encrypted = crypto::encodeValue(value.string_value);
+                        j_entry[valueKey] = encrypted;
+                        j_entry["encrypted"] = true;
+                    } else {
+                        j_entry[valueKey] = value.string_value;
+                    }
+                    break;
+                }
+                default: j_entry[valueKey] = "";
             }
 
             j_entries.push_back(j_entry);
-        }
+        }        
 
-        json j_settings = json{
+        json j_settings = json{            
             { "settings", j_entries }
         };
 
+        // Calculate data hash
+        const auto& hash = crypto::calculateHash(j_settings);
+
+        // Add the hash
+        j_settings["hash"] = hash;
    
-        if(R_FAILED(fsFsDeleteFile(&sdmc, SETTINGS_FILENAME))) {
-            logToFile("[Database] Could not delete the settings file\n"); //Error 514?            
+        if(R_FAILED(fsFsDeleteFile(&sdmc_, SETTINGS_FILENAME))) {
+            logError("[Database] Could not delete the settings file\n"); //Error 514?            
         } else {
-            logToFile("[Database] Successfully removed current settings\n");
+            logDebug("[Database] Successfully removed current settings\n");
         }
 
-        if(R_FAILED(fsFsCreateFile(&sdmc, SETTINGS_FILENAME, 0, 0))) {
-            logToFile("[Database] Could not create the settings file\n");
+        if(R_FAILED(fsFsCreateFile(&sdmc_, SETTINGS_FILENAME, 0, 0))) {
+            logError("[Database] Could not create the settings file\n");
             return;
         } else {
-            logToFile("[Database] New settings file created\n");
+            logDebug("[Database] New settings file created\n");
         }
 
-        if(R_FAILED(fsFsOpenFile(&sdmc, SETTINGS_FILENAME, FsOpenMode_Write | FsOpenMode_Append, &handle_settings))) {
-            logToFile("[Database] The settings file could not be opened for writing\n");
+        if(R_FAILED(fsFsOpenFile(&sdmc_, SETTINGS_FILENAME, FsOpenMode_Write | FsOpenMode_Append, &handle_settings_))) {
+            logError("[Database] The settings file could not be opened for writing\n");
             return;
         } else {
-            logToFile("[Database] Settings file successfully opened\n");
+            logDebug("[Database] Settings file successfully opened for writing\n");
         }
 
         const auto data = j_settings.dump();
         const auto s_data = data.c_str();
-        logToFile("[Database] Writing settings %s (size=%i)\n", s_data, std::strlen(s_data));
+        logDebug("[Database] Writing settings %s (size=%i)\n", s_data, std::strlen(s_data));
 
-        if(R_FAILED(fsFileWrite(&handle_settings, 0, s_data, std::strlen(s_data), FsWriteOption_Flush))) {
-            logToFile("[Database] Could not write into settings file\n");
+        if(R_FAILED(fsFileWrite(&handle_settings_, 0, s_data, std::strlen(s_data), FsWriteOption_Flush))) {
+            logError("[Database] Could not write into settings file\n");
         }
 
-        fsFileClose(&handle_settings);
+        fsFileClose(&handle_settings_);
     }
 
 }

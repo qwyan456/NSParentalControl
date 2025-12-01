@@ -10,9 +10,12 @@
 #include <tesla.hpp>
 #include "gui/main_overlay.h"
 #include "logger.h"
+#include "helpers/ipc_helpers.h"
 #include "AppContext.h"
 
 //Examples : https://github.com/masagrator/Status-Monitor-Overlay/blob/master/source/main.cpp
+
+using namespace alefbet::pctrl::logger;
 
 const bool CIPHER_DATABASE = false;
 constexpr SmServiceName service_name = smEncodeName("pctrl");
@@ -22,23 +25,21 @@ bool connectToService() {
     Result res = tipcDispatchInOut(smGetServiceSessionTipc(), 65100, service_name, exists);
     if(R_FAILED(res) || !exists) {
         getAppContext().is_available = false;
-        logToFile("[Overlay] could not find the service");
+        logError("[Main] could not find the service\n");
         return false;
     } 
         
     getAppContext().is_available = true;
-    logToFile("[Overlay] the service pctrl has been found");    
+    logDebug("[Main] the service pctrl has been found\n");    
 
     res = smGetServiceWrapper(&getAppContext().pctrl_service, service_name);
     if(R_FAILED(res)) {
-        logToFile("[Overlay] could not open service");
-        logIntToFile(R_MODULE(res));
-        logIntToFile(R_DESCRIPTION(res));
+        logError("[Overlay] could not open service (%i.%i)\n", R_MODULE(res), R_DESCRIPTION(res));
         return false;
     }
 
-    logToFile("[Overlay] Connected to pctrl service");
-    logIntToFile(getAppContext().pctrl_service.session);
+    logInfo("[Main] Connected to pctrl service\n");
+    logDebug("[Main] Session=%i\n", getAppContext().pctrl_service.session);
     getAppContext().is_enabled = true;
 
     return true;
@@ -49,19 +50,23 @@ int main(int argc, char** argv) {
     fsInitialize();
     fsdevMountSdmc();
 
-    setLogFilename("sdmc:/switch/pctrl_ovl.log");
     clearLog();
-    
-    connectToService();    
+
+    connectToService();  
+
+    // Get current log level
+    bool debugEnabled = alefbet::pctrl::ipc::isDebugLogEnabled();
+    //getAppContext().is_debug = debugEnabled;
+    setLogLevel(debugEnabled ? DEBUG : INFO);  
 
     tsl::loop<MainOverlay>(argc, argv);    
 
-    logToFile("[Overlay] Close session");
+    logDebug("[Main] Close session\n");
     if(getAppContext().is_enabled) {
         svcCloseHandle(getAppContext().pctrl_service.session);   
     }
 
-    logToFile("[Overlay] Exiting overlay");
+    logDebug("[Main] Exiting overlay\n");
 
     // Clean all
     if(getAppContext().pctrl_service.session > 0) {

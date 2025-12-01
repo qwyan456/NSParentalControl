@@ -23,10 +23,12 @@ namespace alefbet::pctrl::srv {
 
         private:            
             //s16 remainingTimeInMinutes(const HistoryEntry& entry);
+            bool shouldSendNotification(int remainingTimeInMinutes);
 
         private:
             alefbet::pctrl::srv::Service* service_ = nullptr;
             bool running_ = false;
+            bool notified_ = false;
     };    
 
 };

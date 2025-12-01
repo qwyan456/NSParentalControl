@@ -41,7 +41,7 @@ namespace alefbet::pctrl::helpers {
         }
         
         if(parts.size() != 2) {
-            logToFile("[Helpers] Incorrect split of AccountUid %s.\n", uid_str.c_str());
+            logError("[Helpers] Incorrect split of AccountUid %s.\n", uid_str.c_str());
             return uid;
         }
 
@@ -56,7 +56,7 @@ namespace alefbet::pctrl::helpers {
 
         ::Result rc = accountInitialize(AccountServiceType_Administrator);
         if(R_FAILED(rc)) {
-            logToFile("[Helpers] Could not initialize account service: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+            logError("[Helpers] Could not initialize account service: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             user.nickname = UserNickname("ERR#003");
             return user;
         }
@@ -66,29 +66,29 @@ namespace alefbet::pctrl::helpers {
         AccountProfileBase base;
         rc = accountGetProfile(&profile, uid); 
         if(R_FAILED(rc)) {
-            logToFile("[Helpers] Could not get account profile: %i\n", rc);
+            logError("[Helpers] Could not get account profile: %i\n", rc);
             accountExit();
             user.nickname = UserNickname("ERR#005");
             return user;
         } else {
-            logToFile("[Helpers] accountGetProfile() ok\n");
+            logDebug("[Helpers] accountGetProfile() ok\n");
         }
 
         rc = accountProfileGet(&profile, &user_data, &base);
         if(R_FAILED(rc)) {
-            logToFile("[Helpers] Could not get user data: %i\n", rc);
+            logError("[Helpers] Could not get user data: %i\n", rc);
             accountProfileClose(&profile);
             accountExit();
             user.nickname = UserNickname("ERR#006");
             return user;
         } else {
-            logToFile("[Helpers] accountProfileGet() ok\n");
+            logDebug("[Helpers] accountProfileGet() ok\n");
         }
         
         user.uid = uid;
         user.nickname = UserNickname(base.nickname);
         UserUid uidstr = accountUidToString(uid);
-        logToFile("[Helpers] uid=%s, Nickname=%s\n", uidstr.c_str(), user.nickname.c_str());
+        logDebug("[Helpers] uid=%s, Nickname=%s\n", uidstr.c_str(), user.nickname.c_str());
 
         accountProfileClose(&profile);
         accountExit();
@@ -101,7 +101,7 @@ namespace alefbet::pctrl::helpers {
 
         ::Result rc = accountInitialize(AccountServiceType_Administrator);
         if(R_FAILED(rc)) {
-            logToFile("[Helpers] Could not initialize account service: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+            logError("[Helpers] Could not initialize account service: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             user.nickname = UserNickname("ERR#003");
             return user;
         }
@@ -111,13 +111,13 @@ namespace alefbet::pctrl::helpers {
         //logToFile("rc=%i, Uid=%i.%i\n", rc, uid.uid[0], uid.uid[1]);
         rc = accountGetLastOpenedUser(&uid);            
         if(R_FAILED(rc)) {
-            logToFile("[Helpers] Could not get preselected user: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+            logError("[Helpers] Could not get preselected user: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             accountExit();
             user.nickname = UserNickname("ERR#004");
             return user;
         }
 
-        logToFile("[Helpers] user uid: %i.%i\n", uid.uid[0], uid.uid[1]);
+        logDebug("[Helpers] user uid: %i.%i\n", uid.uid[0], uid.uid[1]);
         user.uid = uid;
 
         AccountProfile profile;
@@ -125,27 +125,27 @@ namespace alefbet::pctrl::helpers {
         AccountProfileBase base;
         rc = accountGetProfile(&profile, uid); 
         if(R_FAILED(rc)) {
-            logToFile("[Helpers] Could not get account profile: %i\n", rc);
+            logError("[Helpers] Could not get account profile: %i\n", rc);
             accountExit();
             user.nickname = UserNickname("ERR#005");
             return user;
         } else {
-            logToFile("[Helpers] accountGetProfile() ok\n");
+            logDebug("[Helpers] accountGetProfile() ok\n");
         }
 
         rc = accountProfileGet(&profile, &user_data, &base);
         if(R_FAILED(rc)) {
-            logToFile("[Helpers] Could not get user data: %i\n", rc);
+            logError("[Helpers] Could not get user data: %i\n", rc);
             accountProfileClose(&profile);
             accountExit();
             user.nickname = UserNickname("ERR#006");
             return user;
         } else {
-            logToFile("[Helpers] accountProfileGet() ok\n");
+            logDebug("[Helpers] accountProfileGet() ok\n");
         }
         
         user.nickname = UserNickname(base.nickname);
-        logToFile("[Helpers] uid=%i:%i, Nickname=%s\n", user.uid.uid[0], user.uid.uid[1], user.nickname.c_str());
+        logDebug("[Helpers] uid=%i:%i, Nickname=%s\n", user.uid.uid[0], user.uid.uid[1], user.nickname.c_str());
 
         accountProfileClose(&profile);
         accountExit();
@@ -188,12 +188,15 @@ namespace alefbet::pctrl::helpers {
         
         ::Result rc = nsGetApplicationControlData(NsApplicationControlSource_Storage, title_id, std::addressof(control), sizeof(control), &actual_size);
         if(R_FAILED(rc)) {
-            logToFile("[Helpers] Could not get application control data for title %s\n", titleIdToString(title_id));
+            logError("[Helpers] Could not get application control data for title %s\n", titleIdToString(title_id));
             return "Unknown";
         }
 
         NacpLanguageEntry* langEntry = nullptr;
         rc = nacpGetLanguageEntry(&control.nacp, &langEntry);
+        if(R_FAILED(rc) || langEntry == nullptr) {
+            return "Unknown";
+        }
 
         return std::string(langEntry->name);
     }
@@ -201,7 +204,7 @@ namespace alefbet::pctrl::helpers {
     std::string today() {        
         ::Result rc = timeInitialize();
         if(R_FAILED(rc)) {
-            logToFile("[Helpers] Could not connect to time service\n");
+            logError("[Helpers] Could not connect to time service\n");
             return "";
         }
 
@@ -210,13 +213,13 @@ namespace alefbet::pctrl::helpers {
         TimeCalendarAdditionalInfo info;
         rc = timeGetCurrentTime(TimeType_LocalSystemClock, &ts);        
         if(R_FAILED(rc)) {
-            logToFile("[Helpers] Could not get current time (err %i:%i)\n", R_MODULE(rc), R_DESCRIPTION(rc));
+            logError("[Helpers] Could not get current time (err %i:%i)\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return "";
         }
 
         rc = timeToCalendarTimeWithMyRule(ts, &time, &info);
         if(R_FAILED(rc)) {
-            logToFile("[Helpers] Could not convert timestamp\n");
+            logError("[Helpers] Could not convert timestamp\n");
             return "";
         }
         
@@ -235,84 +238,107 @@ namespace alefbet::pctrl::helpers {
         
         ::Result res = fsOpenSdCardFileSystem(&sdmc);
         if(R_FAILED(res)) {
-            logToFile("[Helpers] Could not open SDMC\n");
+            logError("[Helpers] Could not open SDMC\n");
             return false;
         }
 
         res = fsFsOpenFile(&sdmc, "/atmosphere/reboot_payload.bin", FsOpenMode_Read, &handle);
         if(R_FAILED(res)) {
-            logToFile("[Helpers] Could not open payload file\n");
+            logError("[Helpers] Could not open payload file\n");
             return false;
         }
 
         s64 fileSize = 0;
         res = fsFileGetSize(&handle, &fileSize);
         if(R_FAILED(res)) {
-            logToFile("[Helpers] Could not get file size\n");
+            logError("[Helpers] Could not get file size\n");
             fsFileClose(&handle);
             return false;
         }
 
-        logToFile("[Helpers] Payload file size is %i bytes\n", fileSize);
+        logDebug("[Helpers] Payload file size is %i bytes\n", fileSize);
 
         u64 dataRead = 0;
         res = fsFileRead(&handle, 0, buffer, buffer_size, FsReadOption_None, &dataRead);
         if(R_FAILED(res)) {
-            logToFile("[Helpers] Could not read %i bytes from payload file\n", buffer_size);
+            logError("[Helpers] Could not read %i bytes from payload file\n", buffer_size);
             fsFileClose(&handle);
             return false;
         }
 
         fsFileClose(&handle);
 
-        logToFile("[Helpers] Read %i bytes from payload file\n", dataRead);
+        logDebug("[Helpers] Read %i bytes from payload file\n", dataRead);
         return true;
     }
 
     #define IRAM_PAYLOAD_MAX_SIZE 0x24000
     //static u8 g_reboot_payload[IRAM_PAYLOAD_MAX_SIZE];
     bool rebootToPayload() {
-        logToFile("[Helpers] Try to reboot to payload\n");
+        logInfo("[Helpers] Try to reboot to payload\n");
       
         u8 *g_reboot_payload = new u8[IRAM_PAYLOAD_MAX_SIZE];
         smInitialize();
         if(!readPayloadFile(g_reboot_payload, IRAM_PAYLOAD_MAX_SIZE)) {
-            logToFile("[Helpers] No payload, shutting down.");
+            logError("[Helpers] No payload, shutting down.");
             bpcShutdownSystem();
             return false;
         }
 
-        logToFile("1\n");
         ::Result rc = spsmInitialize();        
         if(R_FAILED(rc)) {
-            logToFile("[Helpers] Failed to initialize SPSM\n");
+            logError("[Helpers] Failed to initialize SPSM\n");
             bpcShutdownSystem();
             return false;
         }
-        logToFile("2\n");
         
         smExit(); //Required to connect to ams:bpc       
-        logToFile("3\n");
 
         rc = amsBpcInitialize();
         if (R_FAILED(rc)) {
-            logToFile("[Helpers] Failed to initialize ams:bpc: %i\n", rc);
-            logToFile("[Helpers] Shutting down.\n");
+            logError("[Helpers] Failed to initialize ams:bpc: %i\n", rc);
+            logError("[Helpers] Shutting down.\n");
             bpcShutdownSystem();
             return false;
-        }
-        logToFile("4\n");        
+        }    
 
-        logToFile("[Helpers] Calling amsBpcSetRebootPayload\n");        
+        logDebug("[Helpers] Calling amsBpcSetRebootPayload\n");        
         if (R_FAILED(amsBpcSetRebootPayload(g_reboot_payload, IRAM_PAYLOAD_MAX_SIZE))) {
-            logToFile("[Helpers] Failed to set reboot to payload: %i\n", rc);
-            logToFile("[Helpers] Shutting down.\n");
+            logError("[Helpers] Failed to set reboot to payload: %i\n", rc);
+            logError("[Helpers] Shutting down.\n");
 
             bpcShutdownSystem();
         } else {
-            logToFile("[Helpers] Rebooting to payload\n");
+            logInfo("[Helpers] Rebooting to payload\n");
 
             spsmShutdown(true);
+        }
+
+        return true;
+    }
+
+    bool terminateCurrentApplication() {
+        logInfo("[Helpers] Trying to terminate the current title\n");
+
+        //Get the current title
+        u64 pid = getRunningApplicationPid();
+        if(pid > 0) {
+            u64 titleId = getRunningApplicationTitleId(pid);
+            if(titleId > 0) {
+                pmshellInitialize();
+                if(R_FAILED(pmshellTerminateProgram(titleId))) {
+                    logError("[Helpers] Could not terminate the title with titleId %s\n", titleIdToString(titleId).c_str());
+                    pmshellExit();
+                    return false;
+                }
+                pmshellExit();
+            } else {
+                logDebug("[Helpers] No title id found for PID %llu\n", pid);
+                return false;
+            }
+        } else {
+            logDebug("[Helpers] No PID found (No running app?)\n");
+            return false;
         }
 
         return true;

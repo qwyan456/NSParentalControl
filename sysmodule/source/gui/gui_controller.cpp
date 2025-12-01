@@ -37,7 +37,7 @@ extern "C" ::Result __nx_nv_create_tmem(TransferMemory *t, u32 *out_size, Permis
 }
 
 void GuiController::showScreenTimeout() {
-    logToFile("[Gui] ShowScreenTimeout\n");
+    logDebug("[Gui] ShowScreenTimeout\n");
 
     ScreenTimeout *screen = new ScreenTimeout();
     screen->setTransferMemory(g_nv_transfer_memory, sizeof(g_nv_transfer_memory));
@@ -61,7 +61,7 @@ void GuiController::showScreenTimeout() {
 }
 
 void GuiController::hideScreenTimeout() {
-    logToFile("[Gui] Hide timeout screen\n");
+    logDebug("[Gui] Hide timeout screen\n");
     clearScreen();
 }
 
@@ -69,7 +69,7 @@ void GuiController::hideScreenTimeout() {
     if(remaining_time_visible_) return;
     remaining_time_visible_ = true;
 
-    logToFile("[Gui] Show remaining time panel\n");
+    logDebug("[Gui] Show remaining time panel\n");
     width_ = 128; //Width must be a multiple of 64
     height_ = 144;
 
@@ -91,10 +91,10 @@ void GuiController::hideScreenTimeout() {
 void GuiController::updateRemainingTimePanel(const u16& remaining_time_in_minutes, const u16& limit_in_minutes) {
     if(!remaining_time_visible_) return;    
 
-    logToFile("[Gui] Update remaining time panel\n");
+    logDebug("[Gui] Update remaining time panel\n");
     auto& renderer = Renderer::get();
     if(!renderer.isInitialized()) {
-        logToFile("[Gui] The renderer is not initialized\n");
+        logError("[Gui] The renderer is not initialized\n");
         return;
     }
 
@@ -105,7 +105,7 @@ void GuiController::updateRemainingTimePanel(const u16& remaining_time_in_minute
     const u8* image_data = nullptr;
     
     float remaining_time_in_percent = (float)remaining_time_in_minutes * 100.0f / (float)limit_in_minutes;
-    logToFile("[Gui] remaining_time_in_percent=%f, remaining_time_in_minutes=%i, limit_in_minutes=%i\n", remaining_time_in_percent, remaining_time_in_minutes, limit_in_minutes);
+    logDebug("[Gui] remaining_time_in_percent=%f, remaining_time_in_minutes=%i, limit_in_minutes=%i\n", remaining_time_in_percent, remaining_time_in_minutes, limit_in_minutes);
 
     if(remaining_time_in_minutes >= 0 && remaining_time_in_minutes <= 5) {
         // Manage the 5 last minutes
@@ -146,7 +146,7 @@ void GuiController::updateRemainingTimePanel(const u16& remaining_time_in_minute
     if(image_data != nullptr) {
         renderer.drawBitmap(0, 0, width_, height_, image_data);
     } else {
-        logToFile("[Gui] No rule found to show an image.\n");
+        logError("[Gui] No rule found to show an image.\n");
     }
     
     renderer.endFrame();
@@ -158,13 +158,13 @@ void GuiController::hideRemainingTimePanel() {
     auto& renderer = Renderer::get();    
     if(!renderer.isInitialized()) return;
 
-    logToFile("[Gui] Hide remaining time panel\n");
+    logDebug("[Gui] Hide remaining time panel\n");
     clearScreen();
     remaining_time_visible_ = false;
 }
 
 void GuiController::showOverlay(u16 width, u16 height, u16 posX, u16 posY) {
-    logToFile("[Gui] show Overlay of size %ix%i\n", width, height);
+    logDebug("[Gui] show Overlay of size %ix%i\n", width, height);
 
     auto& renderer = Renderer::get();    
     renderer.init(width, height, posX, posY);

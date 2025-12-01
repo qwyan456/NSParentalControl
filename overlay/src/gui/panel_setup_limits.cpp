@@ -82,6 +82,11 @@ bool SetupLimitsPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouchSta
     // B to cancel
     if(keysDown & HidNpadButton_B) {
         tsl::goBack();
+
+        // Update the setting only when exitting
+        u16 limitInMinutes = dailyLimitHours_*60 + dailyLimitMinutes_;
+        ipc::setDailyLimit(limitInMinutes);
+
         return true;
     } else if(keysDown & HidNpadButton_AnyDown) {
         decreaseValue();
@@ -92,11 +97,7 @@ bool SetupLimitsPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouchSta
     } else if(keysDown & HidNpadButton_AnyRight) {
         selectNextItem();
     }
-
-    // Update the setting
-    u16 limitInMinutes = dailyLimitHours_*60 + dailyLimitMinutes_;
-    ipc::setDailyLimit(limitInMinutes);
-
+    
     return false; 
 }
 

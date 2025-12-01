@@ -24,7 +24,7 @@ namespace Ipc {
 
         // Exit if invalid session count given
         if (maxClients < 1 || maxClients > MAX_WAIT_OBJECTS - 1) {
-            logToFile("[IPC] Invalid number of sessions requested\n");
+            logError("[IPC] Invalid number of sessions requested\n");
             this->error_ = true;
             return;
         }
@@ -35,11 +35,11 @@ namespace Ipc {
         smInitialize();
         ::Result rc = smRegisterService(&serverHandle, this->serverName, false, maxClients);
         if (R_FAILED(rc)) {
-            logToFile("[IPC] Couldn't create server: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+            logError("[IPC] Couldn't create server: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             return;
         }
 
-        logToFile("[IPC] Server started\n");
+        logInfo("[IPC] Server started\n");
         this->handles.push_back(serverHandle);
     }
 
@@ -49,7 +49,7 @@ namespace Ipc {
         // Wait for request
         ::Result rc = svcReplyAndReceive(&tmp, &this->handles[index], 1, 0, UINT64_MAX);
         if (R_FAILED(rc)) {
-            logToFile("[IPC] Couldn't receive request (closing handle): %i\n", rc);
+            logError("[IPC] Couldn't receive request (closing handle): %i\n", rc);
             svcCloseHandle(this->handles[index]);
             this->handles.erase(this->handles.begin() + index);
             return true;        // Return true as closing a session is valid behaviour
@@ -58,7 +58,7 @@ namespace Ipc {
         // Create object from received data
         Request * request = Request::fromTLS();
         if (!request) {
-            logToFile("[IPC] An error occurred creating the request object (most likely bad header magic)\n");
+            logError("[IPC] An error occurred creating the request object (most likely bad header magic)\n");
             return false;
         }
 
@@ -82,7 +82,7 @@ namespace Ipc {
 
             // Otherwise prepare error response
             default:
-                logToFile("[IPC] Received unexpected CmifCommand (%i)\n", request->type());
+                logError("[IPC] Received unexpected CmifCommand (%i)\n", request->type());
                 request->setResult(MAKERESULT(11, 403));
                 request->toResponseTLS();
                 break;
@@ -97,7 +97,7 @@ namespace Ipc {
 
         // Close session on error or close request
         if (R_FAILED(rc) || closeSession) {
-            logToFile("Closing session %i due to error/request\n", index);
+            logError("Closing session %i due to error/request\n", index);
             svcCloseHandle(this->handles[index]);
             this->handles.erase(this->handles.begin() + index);
         }
@@ -111,7 +111,7 @@ namespace Ipc {
         if (R_SUCCEEDED(rc)) {
             // Check we have room
             if (this->handles.size() >= this->maxHandles) {
-                logToFile("[IPC] Couldn't handle new session due to limit\n");
+                logError("[IPC] Couldn't handle new session due to limit\n");
                 svcCloseHandle(session);
 
             // Add session to vector
@@ -144,7 +144,7 @@ namespace Ipc {
         if (R_SUCCEEDED(rc)) {
             // Check we're within range
             if (handleIndex < 0 || static_cast<uint32_t>(handleIndex) >= this->handles.size()) {
-                logToFile("[IPC] svcWaitSynchronization returned out of range index: %i\n", handleIndex);
+                logError("[IPC] svcWaitSynchronization returned out of range index: %i\n", handleIndex);
                 this->error_ = true;
                 return false;
             }
@@ -161,7 +161,7 @@ namespace Ipc {
 
             // Exit on an error
             if (!ok) {
-                logToFile("[IPC] Failed to handle %s %i request\n", handleIndex == 0 ? "server" : "client ", handleIndex);
+                logError("[IPC] Failed to handle %s %i request\n", handleIndex == 0 ? "server" : "client ", handleIndex);
                 this->error_ = true;
             }
         }
@@ -180,7 +180,7 @@ namespace Ipc {
             svcCloseHandle(this->handles[0]);
             ::Result rc = smUnregisterService(this->serverName);
             if (R_FAILED(rc)) {
-                logToFile("[IPC] Couldn't unregister server: %i\n", rc);
+                logError("[IPC] Couldn't unregister server: %i\n", rc);
             }
         }
 

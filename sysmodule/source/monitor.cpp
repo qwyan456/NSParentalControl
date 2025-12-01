@@ -3,7 +3,9 @@
 #include "helpers.h"
 #include "database/settings.h"
 #include "database/database.h"
+#include "notifications_controller.h"
 #include <chrono>
+#include <list>
 //#include "pctrl_screen.hpp"
 
 using namespace alefbet::pctrl::logger;
@@ -22,8 +24,8 @@ namespace alefbet::pctrl::srv {
     The remaining time can be negative when the user outpass his limit.
     */
     /*s16 Monitor::remainingTimeInMinutes(const HistoryEntry& entry, const u16& daily_limit) {        
-        logToFile("[Monitor] daily limit=%i\n", daily_limit);
-        logToFile("[Monitor] duration=%i\n", entry.durationInMinutes());
+        logDebug("[Monitor] daily limit=%i\n", daily_limit);
+        logDebug("[Monitor] duration=%i\n", entry.durationInMinutes());
 
                  
     }*/
@@ -34,7 +36,7 @@ namespace alefbet::pctrl::srv {
     }
 
     void Monitor::loop() {        
-        logToFile("[Monitor] Starting monitoring loop\n");        
+        logDebug("[Monitor] Starting monitoring loop\n");        
         //WorkingMode workingMode = WorkingModeInfo;        
         u64 pid = 0;
 
@@ -44,21 +46,27 @@ namespace alefbet::pctrl::srv {
                 svcSleepThread(500'000'000); // Wait for 500ms
                 continue;
             }
+
+            if(!notified_) {
+                logInfo("[Monitoring] Parental control is now enabled.\n");
+                NotificationsController::notifyMonitoringStarted();
+                notified_ = true;
+            }
             
-            logToFile("[Monitor] Monitoring loop...\n");
+            logDebug("[Monitor] Monitoring loop has started\n");
             auto settings = loadSettings();
 
             // Verify whether the service is enabled
             if(settings.contains(SETTING_ENABLED)) {
                 const auto setting = settings[SETTING_ENABLED];
                 if(setting.int_value == 0) {
-                    logToFile("[Monitor] parental control is now disabled.\n");
+                    logInfo("[Monitor] Parental Control is now disabled.\n");
                     running_ = false;
                     return;
                 }
             }            
 
-            logToFile("[Monitor] Update usages\n");
+            logDebug("[Monitor] Update usages\n");
             // Query the active application and user
             // and update the database
             pid = getRunningApplicationPid();            
@@ -70,27 +78,22 @@ namespace alefbet::pctrl::srv {
                 const auto user = getCurrentUser();
 
                 if(user.isValid()) {
-                    logToFile("[Monitor] Title %i is currently in used by %s. Updating history.\n", title_id, user.nickname.c_str());                    
-
-                    /*for(const auto& [key, value]: settings) {
-                        std::string _key(key);
-                        logToFile("[Monitor] setting key: %s\n", _key.c_str());
-                    }*/
+                    logInfo("[Monitor] Title %i is currently in used by %s. Updating history.\n", title_id, user.nickname.c_str());                    
 
                     //Update working mode
                     //Show remaining time is disabled
                     /*if(settings.contains(SETTING_WORKING_MODE)) {
                         workingMode = (WorkingMode)settings[SETTING_WORKING_MODE].int_value;
-                        logToFile("[Monitor] Working mode is %i\n", workingMode);
+                        logDebug("[Monitor] Working mode is %i\n", workingMode);
                     }
 
                     if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
                         if(settings[SETTING_SHOW_REMAINING_TIME].int_value == 1) {
-                            logToFile("[Monitor] Show remaining time.\n");
+                            logDebug("[Monitor] Show remaining time.\n");
                             service_->gui().ShowRemainingTime();
                         }
                     } else {
-                        logToFile("[Monitor] Force show remaining time (TEST)\n");
+                        logDebug("[Monitor] Force show remaining time (TEST)\n");
                         service_->gui().ShowRemainingTime();
                     }*/
 
@@ -102,42 +105,38 @@ namespace alefbet::pctrl::srv {
 
                     //const auto uid_str = accountUidToString(user.uid);
                     u16 remainingTimeInMinutes = daily_limit > entry.durationInMinutes() ? daily_limit - entry.durationInMinutes() : 0;
-                    logToFile("[Monitor] Remaining time for user %s is %i minutes. Daily limit=%i\n", user.nickname.c_str(), remainingTimeInMinutes, daily_limit);
+                    logDebug("[Monitor] Remaining time for user %s is %i minutes. Daily limit=%i\n", user.nickname.c_str(), remainingTimeInMinutes, daily_limit);
 
                     // DISABLED
-                    /*if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
+                    if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
                         const auto& showRemainingTime = settings[SETTING_SHOW_REMAINING_TIME].int_value > 0;                                                
-                        if(showRemainingTime) {
-                            if(!service_->gui().isRemainingTimePanelVisible()) {
-                                logToFile("[Monitor] Show the remaining time panel\n");
-                                service_->gui().showRemainingTimePanel();
+                        if(showRemainingTime) {                            
+                            if(shouldSendNotification(remainingTimeInMinutes)) {
+                                NotificationsController::notifyRemainingTime(remainingTimeInMinutes);
                             }
-
-                            logToFile("[Monitor] Update the remaining time panel\n");
-                            service_->gui().updateRemainingTimePanel(remainingTimeInMinutes, daily_limit); 
                         }
-                    }*/
+                    }
                     
                     // After database update we need to verify the limits
                     //const auto remaining_time = remainingTimeInMinutes(entry);                                    
 
                     if(remainingTimeInMinutes <= 0) {
-                        logToFile("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
+                        logInfo("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
                         //service_->gui().ShowScreenTimeout();
                         service_->showScreenTimeout();
                     } /*else { // DISABLED
-                        logToFile("[Monitor] Remaining time for user %s is %i minutes.\n", user.nickname.c_str(), remainingTimeInMinutes);
+                        logDebug("[Monitor] Remaining time for user %s is %i minutes.\n", user.nickname.c_str(), remainingTimeInMinutes);
                         service_->gui().updateRemainingTimePanel(remainingTimeInMinutes, daily_limit);
                     }*/
                 } else {
-                    logToFile("[Monitor] No user found\n");
+                    logDebug("[Monitor] No user found\n");
                 }
             } else {
-                logToFile("[Monitor] No title running\n");
+                logDebug("[Monitor] No title running\n");
                 /*if(service_->gui().isRemainingTimePanelVisible()) { // DISABLED
                     service_->gui().hideRemainingTimePanel();
                 }*/
-                logToFile("[Monitor] ok\n");
+                logDebug("[Monitor] ok\n");
             }
 
             // DISABLED
@@ -152,16 +151,21 @@ namespace alefbet::pctrl::srv {
                 svcSleepThread(SubLoopDelayInNanos.count()); // Wait a little
             }*/
 
-            logToFile("[Monitoring] loop\n");
+            logDebug("[Monitoring] loop\n");
             svcSleepThread(MainLoopDelayInNanos.count()); //Wait 1 minute
         }
 
-        logToFile("[Monitor] Stopped monitoring.\n");
+        logInfo("[Monitor] Stopped monitoring.\n");
     }
 
     void Monitor::stop() {
-        logToFile("[Monitor] Stopping monitor\n");
+        logInfo("[Monitor] Stopping monitor\n");
         running_ = false;
+        notified_ = false;
     }
 
+    bool Monitor::shouldSendNotification(int remainingTimeInMinutes) {
+        // Remaining time notitications are sent every 15 minutes and every minute during the last 5 minutes
+        return remainingTimeInMinutes % 15 == 0 || remainingTimeInMinutes <= 5;
+    }
 }

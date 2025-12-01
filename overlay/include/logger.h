@@ -1,15 +1,30 @@
 #pragma once
+#include <string>
+#include <cstdarg>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace alefbet {
+    namespace pctrl { 
+        namespace logger {
+            typedef enum {
+                DEBUG = 0,                
+                INFO = 5,
+                ERROR = 10
+            } LogLevel;
 
-void setLogFilename(const char* filename);
-void clearLog();
-void logIntToFile(int i);
-void logPointerToFile(void* i);
-void logToFile(const char* msg);
+            bool openFile();
+            void clearLog();            
+            void debugHipcMetaHeader(void* hdr);
+            void closeFile();            
+            void logDebug(const char *fmt, ...);
+            void logInfo(const char *fmt, ...);
+            void logError(const char *fmt, ...);
+            
+            void setLogLevel(LogLevel level);
+            LogLevel currentLogLevel();            
 
-#ifdef __cplusplus
+            namespace priv {
+                void logToFile(const char *fmt, va_list);
+            }
+        }
+    }
 }
-#endif

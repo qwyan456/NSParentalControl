@@ -42,7 +42,7 @@ BUILD		:=	build.nosync
 SOURCES		:=	source source/database source/ipc source/gui
 DATA		:=	data
 INCLUDES	:=	source source/database source/ipc source/gui
-APP_VERSION	:=	1.1
+APP_VERSION	:=	1.2
 
 #ifeq ($(RELEASE),)
 #	APP_VERSION	:=	$(APP_VERSION)-$(shell git describe --dirty --always)
@@ -63,7 +63,7 @@ CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=c++20
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-wrap,exit -Wl,-Map,$(notdir $*.map)
 
-LIBS	:= -lnx
+LIBS	:= 	-lnx -L/opt/devkitpro/portlibs/switch/lib -lmbedcrypto
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -88,7 +88,9 @@ export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
 
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
-CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+#EXT_CFILES 	:=  ../tiny-AES-c/aes.c
+#CFILES		:=	$(shell mkdir -p $(CURDIR)/import; cp $(EXT_CFILES) $(CURDIR)/import) 
+CFILES      :=  $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c))) 
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
@@ -165,11 +167,11 @@ endif
 #---------------------------------------------------------------------------------
 all: $(BUILD)
 
-$(BUILD):
+$(BUILD):	
 	mkdir -p $(OUTDIR)
 	@[ -d $@ ] || mkdir -p $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
-	cp $(OUTPUT).nsp $(OUTDIR)/exefs.nsp
+	cp $(OUTPUT).nsp $(OUTDIR)/exefs.nsp	
 
 #---------------------------------------------------------------------------------
 clean:

@@ -47,41 +47,6 @@ namespace alefbet::pctrl::gui {
         return tmp_pos / 2;
     }
 
-    /*void ScreenTimeout::InitializeFrameBufferPointer() {
-        logToFile("[Screen] InitializeFrameBufferPointer\n");
-
-        // We couldn't use heap, so try insecure memory, from the system nonsecure pool.
-        {
-            uintptr_t address = 0;
-            if (R_SUCCEEDED(os::AllocateInsecureMemory(std::addressof(address), FrameBufferRequiredSizePageAligned))) {            
-                g_framebuffer_pointer = reinterpret_cast<u8 *>(address);
-                logToFile("[Screen] g_framebuffer_pointer initialized in insecure memory @%p\n", g_framebuffer_pointer);
-                return;
-            }
-
-            logToFile("[Screen] Allocate insecure memory failed\n");
-        }
-
-        // Neither heap nor insecure is available, so we're going to have to try to raid the unsafe pool. 
-        {
-            // First, increase the limit to an extremely high value.
-            size_t large_size = std::max(128_MB, FrameBufferRequiredSizeHeapAligned);
-            while (svc::ResultLimitReached::Includes(svc::SetUnsafeLimit(large_size))) {
-                large_size *= 2;
-            }
-
-            // Next, map some unsafe memory. 
-            uintptr_t address = 0;
-            if (R_SUCCEEDED(os::AllocateUnsafeMemory(std::addressof(address), FrameBufferRequiredSizePageAligned))) {
-                g_framebuffer_pointer = reinterpret_cast<u8 *>(address);
-                logToFile("[Screen] g_framebuffer_pointer initialized in insecure pool @%p\n", g_framebuffer_pointer);
-                return;
-            }
-
-            logToFile("[Screen] No memory could be allocated for framebuffer\n");
-        }
-    }*/
-
     void ScreenTimeout::setTransferMemory(u8* memory, u64 size) {
         g_nv_transfer_memory = memory;
         nv_transfer_memory_size = size;
@@ -90,7 +55,7 @@ namespace alefbet::pctrl::gui {
     void ScreenTimeout::InitializeFrameBufferPointer() {
         void* mem = aligned_alloc(0x1000, FrameBufferRequiredSizePageAligned);
         if(mem == nullptr) {
-            logToFile("[Screen timeout] Could not allocate %i bytes of memory\n", FrameBufferRequiredSizePageAligned);
+            logError("[Screen timeout] Could not allocate %i bytes of memory\n", FrameBufferRequiredSizePageAligned);
         }
 
         g_framebuffer_pointer = reinterpret_cast<u8*>(mem);
@@ -98,7 +63,7 @@ namespace alefbet::pctrl::gui {
 
     /* Task implementations. */
     ::Result ScreenTimeout::SetupDisplayInternal() {
-        logToFile("[Screen] SetupDisplayInternal\n");
+        logDebug("[Screen] SetupDisplayInternal\n");
 
         ViDisplay temp_display;
 
@@ -106,18 +71,18 @@ namespace alefbet::pctrl::gui {
         ::Result res = viOpenDisplay("Internal", std::addressof(temp_display));
         if(R_FAILED(res)) {
             // Do not overreact
-            logToFile("[Screen] Could not open internal display\n");
+            logError("[Screen] Could not open internal display\n");
             // but fail...
             return res;
         }        
         
-        logToFile("[Screen] Turn the screen on.\n");
+        logDebug("[Screen] Turn the screen on.\n");
         viSetDisplayPowerState(std::addressof(temp_display), ViPowerState_On);        
 
         /* Set alpha to 1.0f. */
         res = viSetDisplayAlpha(std::addressof(temp_display), 1.0f);
         if(R_FAILED(res)) {
-            logToFile("[Screen] Could not set internal display alpha\n");
+            logError("[Screen] Could not set internal display alpha\n");
         }
 
         viCloseDisplay(std::addressof(temp_display));
@@ -126,14 +91,14 @@ namespace alefbet::pctrl::gui {
     }
 
     ::Result ScreenTimeout::SetupDisplayExternal() {
-        logToFile("[Screen] SetupDisplayExternal\n");
+        logDebug("[Screen] SetupDisplayExternal\n");
 
         ViDisplay temp_display;
         /* Try to open the display. */
         ::Result res = viOpenDisplay("External", std::addressof(temp_display));
         if(R_FAILED(res)) {
             // Do not overreact
-            logToFile("[Screen] Could not open external display\n");
+            logError("[Screen] Could not open external display\n");
             // but fail...
             return res;
         }
@@ -141,7 +106,7 @@ namespace alefbet::pctrl::gui {
         /* Set alpha to 1.0f. */
         res = viSetDisplayAlpha(std::addressof(temp_display), 1.0f);
         if(R_FAILED(res)) {
-            logToFile("[Screen] Could not set external display alpha\n");
+            logError("[Screen] Could not set external display alpha\n");
         }
 
         viCloseDisplay(std::addressof(temp_display));
@@ -150,12 +115,12 @@ namespace alefbet::pctrl::gui {
     }
 
     ::Result ScreenTimeout::PrepareScreenForDrawing() {    
-        logToFile("[Screen] PrepareScreenForDrawing\n");
+        logDebug("[Screen] PrepareScreenForDrawing\n");
 
         /* Connect to vi. */
         ::Result res = viInitialize(ViServiceType_Manager);
         if(R_FAILED(res)) {
-            logToFile("[Screen] Could not initialise VI service\n");
+            logError("[Screen] Could not initialise VI service\n");
             return res; //Fail
         }
 
@@ -189,7 +154,7 @@ namespace alefbet::pctrl::gui {
             "[Screen] Could not create layer.\n"
         )
 
-        logToFile("[Screen] Layer address=%p\n", (void*)std::addressof(m_layer));
+        logDebug("[Screen] Layer address=%p\n", (void*)std::addressof(m_layer));
 
         /* Setup the layer. */
         {
@@ -237,12 +202,12 @@ namespace alefbet::pctrl::gui {
     }
 
     void ScreenTimeout::PreRenderFrameBuffer() {   
-        logToFile("[Screen] PreRenderFrameBuffer\n");
+        logDebug("[Screen] PreRenderFrameBuffer\n");
 
         /* Allocate a frame buffer. */
         InitializeFrameBufferPointer();
         if(g_framebuffer_pointer == nullptr) {
-            logToFile("[Screen] The framebuffer pointer is null. Aborting.\n");
+            logError("[Screen] The framebuffer pointer is null. Aborting.\n");
             return;
         }
 
@@ -255,16 +220,16 @@ namespace alefbet::pctrl::gui {
     }
 
     ::Result ScreenTimeout::PreRenderContents() {
-        logToFile("[Screen] PreRenderContents\n");
+        logDebug("[Screen] PreRenderContents\n");
 
         if(!sharedFontInitialized) {
             /* Load shared font. */
             ::Result res = alefbet::pctrl::font::InitializeSharedFont();
             if(R_FAILED(res)) {
-                logToFile("[Screen] Could not initialize shared font\n");
+                logError("[Screen] Could not initialize shared font\n");
                 return 1;
             } else {
-                logToFile("[Screen] Shared font loaded\n");
+                logError("[Screen] Shared font loaded\n");
                 sharedFontInitialized = true;
             }
         }
@@ -273,18 +238,13 @@ namespace alefbet::pctrl::gui {
         u16 *tiled_buf = reinterpret_cast<u16 *>(g_framebuffer_pointer);
 
         /* Let the font manager know about our framebuffer. */
-        logToFile("1\n");
         font::ConfigureFontFramebuffer(tiled_buf, GetPixelOffset);
-        logToFile("2\n");
         font::SetFontColor(0x000F);
-        logToFile("3\n");
 
         /* Draw a background. */
         for (size_t i = 0; i < FrameBufferRequiredSizeBytes / sizeof(*tiled_buf); i++) {
             tiled_buf[i] = pctrl_logo[0];
         }
-
-        logToFile("4\n");
         
         u32 logo_x = (PctrlScreenWidth - LogoWidth) / 2;
         u32 logo_y = (PctrlScreenHeight - LogoHeight) / 2;
@@ -296,25 +256,19 @@ namespace alefbet::pctrl::gui {
             }
         }
 
-        logToFile("5\n");
-
         /* Show message */
         font::SetPosition(336, 318);
         font::SetFontSize(62.0f);
-        logToFile("6\n");
         font::Print("Your time is up!");
-        logToFile("7\n");
         font::SetPosition(473, 402);
         font::SetFontSize(25.0f);
-        logToFile("8\n");
         font::Print("Press Vol+ to reboot");
-        logToFile("9\n");
         
         return 0;
     }
 
     ::Result ScreenTimeout::InitializeNativeWindow() {
-        logToFile("[Screen] InitializeNativeWindow\n");
+        logDebug("[Screen] InitializeNativeWindow\n");
 
         //* Setup nv driver. */
         TRY_AND_RETURN(
@@ -372,77 +326,45 @@ namespace alefbet::pctrl::gui {
     }
 
     void ScreenTimeout::DisplayPreRenderedFrame() {
-        logToFile("[Screen] DisplayPreRenderedFrame\n");
+        logDebug("[Screen] DisplayPreRenderedFrame\n");
 
         s32 slot;
 
-        logToFile("[Screen] Before nwindowDequeueBuffer\n");
+        logDebug("[Screen] Before nwindowDequeueBuffer\n");
         ::Result res = nwindowDequeueBuffer(std::addressof(m_win), std::addressof(slot), nullptr);
         if(res != 0) {
-            logToFile("[Screen] Could not dequeue buffer for nwindow\n");
+            logError("[Screen] Could not dequeue buffer for nwindow\n");
             return;
         }
 
-        logToFile("[Screen] Before dd:FlushDataCache\n");
+        logDebug("[Screen] Before dd:FlushDataCache\n");
         //dd::FlushDataCache(g_framebuffer_pointer, FrameBufferRequiredSizeBytes);
         //svcFlushProcessDataCache(0xFFFF8001, reinterpret_cast<uintptr_t>(g_framebuffer_pointer), FrameBufferRequiredSizeBytes);
         armDCacheFlush(g_framebuffer_pointer, FrameBufferRequiredSizeBytes);
-        logToFile("[Screen] After dd::FlushDataCache\n");
+        logDebug("[Screen] After dd::FlushDataCache\n");
         res = nwindowQueueBuffer(std::addressof(m_win), m_win.cur_slot, NULL);
         if(R_FAILED(res)) {
-            logToFile("[Screen timeout] Coulr not dequeue window buffer: %i.%i\n", R_MODULE(res), R_DESCRIPTION(res));
+            logError("[Screen timeout] Coulr not dequeue window buffer: %i.%i\n", R_MODULE(res), R_DESCRIPTION(res));
         }
     }
 
     ::Result ScreenTimeout::ShowScreenTimeout() {
-        logToFile("[Screen] Show timeout screen\n");
+        logDebug("[Screen] Show timeout screen\n");
         
         /* Pre-render the framebuffer. */
         this->PreRenderFrameBuffer();
 
         /* Prepare screen for drawing. */
         ::Result res = this->PrepareScreenForDrawing();
-        if(res != 0) {
-            logToFile("[Screen] PrepareScreenForDrawing failed\n");
+        if(R_FAILED(res)) {
+            logError("[Screen] PrepareScreenForDrawing failed\n");
             return res;
         }
 
         /* Display the pre-rendered frame. */
-        this->DisplayPreRenderedFrame();
-        
-        /* Wait for the user to press the Volume button */
-        /*if(WaitForVolumeButton()) {
-            logToFile("[Screen] Volume button pressed, shutdown the console\n");
-            helpers::rebootToPayload();
-            do { __asm__ __volatile__("" ::: "memory"); } while (1);
-        } else {
-            logToFile("[Screen] Error: returned from WaitForPowerButton() without pressing button\n");
-        }*/
+        this->DisplayPreRenderedFrame();       
 
         return 0;
     }
-
-    /*bool ScreenTimeout::WaitForVolumeButton() {
-        gpio::Initialize();
-        gpio::GpioPadSession vol_btn;
-        if(gpio::OpenSession(std::addressof(vol_btn), gpio::DeviceCode_ButtonVolUp).IsFailure()) {
-            logToFile("[Screen] Failed to open session with GPIO\n");
-        }
-
-        ON_SCOPE_EXIT { gpio::CloseSession(std::addressof(vol_btn)); };
-
-        gpio::SetDirection(std::addressof(vol_btn), gpio::Direction_Input);
-
-        while(true) {
-            if(gpio::GetValue(std::addressof(vol_btn)) == gpio::GpioValue_Low) {
-                logToFile("[Screen] Volume button has been pressed\n");
-                return true;
-            }
-
-            os::SleepThread(TimeSpan::FromMilliSeconds(100));
-        }
-
-        return false;
-    }*/
 
 }

@@ -1,12 +1,24 @@
 # NS Parental Control
 
+[![platform](https://img.shields.io/badge/platform-Switch-898c8c?logo=C++.svg)](https://gbatemp.net/forums/nintendo-switch.283/?prefix_id=44)
+[![language](https://img.shields.io/badge/language-C++-ba1632?logo=C++.svg)](https://github.com/topics/cpp)
+[![GPLv3 License](https://img.shields.io/badge/license-GPLv3-189c11.svg)](https://www.gnu.org/licenses/old-licenses/gpl-3.0.en.html)
+[![Latest Version](https://img.shields.io/github/v/release/TristanIsrael/NSParentalControl?label=latest&color=blue)](https://github.com/TristanIsrael/NSParentalControl/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/TristanIsrael/NSParentalControl/total?color=6f42c1)](https://github.com/TristanIsrael/NSParentalControl/graphs/traffic)
+[![GitHub issues](https://img.shields.io/github/issues/TristanIsrael/NSParentalControl?color=222222)](https://github.com/TristanIsrael/NSParentalControl/issues)
+[![GitHub stars](https://img.shields.io/github/stars/TristanIsrael/NSParentalControl)](https://github.com/TristanIsrael/NSParentalControl/stargazers)
+
 NS Parental Control is a simple parental control system for the Nintendo Switch which does not require Internet access or a smartphone to operate.
 
 It can be used freely.
 
-## Current version
+The user manual can be found [here](docs/manual.md).
 
-1.1.0
+## Dependencies
+
+Linked with:
+- libnx 4.10.0 
+- libultrahand 2.2.0
 
 ## Table of Contents
 
@@ -30,13 +42,17 @@ The following users are involved:
 Parental control has the following features:
 
 **Gamers**
-- Check the played time
-- Check the remaining play time
-- When the time is out, the system is blocked
+- Check the played time (since 1.0)
+- Check the remaining play time (since 1.0)
+- When the time is out, the system is blocked (since 1.0)
+- Be notified every 15 minutes and every minute in the last 5 minutes (since 1.2)
+- Get usage history (since 1.2)
 
 **Administrator** (protected by a PIN code)
-- Define a PIN to protect setup access - *default PIN is A A A A*
-- Enable or disable the parental control
+- Define a PIN to protect setup access - *default PIN is A A A A* (since 1.0)
+- Enable or disable the parental control (since 1.0)
+- Enable or disable the notifications (since 1.2)
+- Choose the log level between Debug and Information (since 1.2)
 
 ## Coming features
 
@@ -59,7 +75,7 @@ Coming features are in the [GitHub project](https://github.com/users/TristanIsra
 ![Parental control limits setting](docs/2025102321565700.jpg)
 **Parental control limits settings**
 
-![Time out](pctrl/misc/timeout.png)
+![Time out](docs/timeout.png)
 **Timeout screen**
 
 ## Licence
@@ -88,7 +104,9 @@ Libraries linked or code reused:
 
 ## Installation
 
-1. Install the required [**Tesla Menu**](https://switch.hacks.guide/homebrew/tesla-menu.html) or [**Ultrahand Overlay**](https://github.com/ppkantorski/Ultrahand-Overlay)
+1. Install the required [**Tesla Menu**](https://switch.hacks.guide/homebrew/tesla-menu.html) or [**Ultrahand Overlay**](https://github.com/ppkantorski/Ultrahand-Overlay).
+
+⚠️ If you want notifications you have to install **[Ultrahand Overlay](https://github.com/ppkantorski/Ultrahand-Overlay)**. Please look at its documentation to know how to install it and how to enable the notifications.
 
 2. Download the latest release from [GitHub](https://github.com/TristanIsrael/NSParentalControl/releases/tag/1.1).
 
@@ -98,7 +116,7 @@ Here are the files and their destination:
 |--|--|--|
 | exefs.nsp | /atmosphere/contents/420000000003103 | The core of the system as a *sysmodule* |
 | toolbox.json | /atmosphere/contents/420000000003103 | A description file for Atmosphère |
-| boot2.flag | /atmosphere/contents/420000000003103/flags | Needed file to make the sysmodule start at boot |
+| boot2.flag | /atmosphere/contents/420000000003103/flags | Mandatory file to make the sysmodule start at boot |
 | parental_control.ovl | /switch/.overlays | The overlay |
 
 After copying the files, reboot the console.
@@ -109,7 +127,7 @@ This section explains how to create and install the binary for NS Parental Contr
 
 ### Architecture
 
-This product relies on 3 components:
+This product relies on 2 components:
 1 - a sysmodule that monitors the games usage and notifies when limit is reached. 
 2 - an overlay that shows on demand information about the limits and permits setup of the limits.
 
@@ -118,7 +136,7 @@ The sysmodule and the overlay share a common database file.
 ### Pre-requisistes for runtime
 
 - Atmosphere installed
-- Tesla menu installed
+- Tesla menu installed or Ultrahand overlay for notification
 
 ### Pre-requisites for build
 
@@ -130,25 +148,13 @@ The sysmodule and the overlay share a common database file.
 
 Installation of devkitPro is described on [this page](https://switchbrew.org/wiki/Setting_up_Development_Environment).
 
-### Download Atmosphere source code
-
-Atmosphere source code is needed to build the sysmodule.
-
-The code can be downloaded using [this link](https://github.com/Atmosphere-NX/Atmosphere/archive/refs/heads/master.zip) or by cloning the repository using the repo URL https://github.com/Atmosphere-NX/Atmosphere.git.
-
-### Build Atmosphere sysmodule
+### Build the sysmodule
 
 Once the code is downloaded or cloned do the following:
 
-- copy the folder `pctrl` into `<Atmosphere source dir>/stratosphere/`.
-- append `pctrl` to the declaration of `MODULES` in `<Atmosphere source dir>/stratosphere/stratosphere.mk` or run `$ sed -i.bak 's/^\(ALL_MODULES :=.*\)$/\1 pctrl/' stratosphere.mk`
-- build stratosphere by running `$ make` in the directory `<Atmosphere source dir>/stratosphere`.
+Go to the directory `NSParentalControl/sysmodule`
 
-You way need to build Atmosphere in a first step by running the command `$ make` in the root of Atmosphere directory.
-
-At the end of the build, the sysmodule is available in the directory `<Atmosphere source dir>/stratosphere/pctrl/out/nintendo_nx_arm64_armv8a/release/pctrl.nsp`. 
-
-Rename it to `exefs.nsp`.
+Run the command `$ make`. At the end of the build, the `out.nosync` directory contains the file `exefs.nsp`.
 
 This file should be copied in the directory `/atmosphere/contents/420000000003103` of the SD card of the Switch.
 
@@ -164,7 +170,7 @@ Copy this file in the directory `/switch/.overlays/` in the SD card of the Switc
 
 In order for the parental control to load on startup you have to create a new folder named `flags` into `/atmosphere/contents/420000000003103`. 
 
-In this folder create an empty file named `boot2.flag`
+In this folder create an empty file named `boot2.flag`.
 
 ## References
 
@@ -172,9 +178,9 @@ https://github.com/switchbrew/switch-examples/tree/master
 
 ## Credits
 
-- Niels Lohmann <https://nlohmann.me> for JSON C++ library
-- @SciresM for Atmosphère
-- Sean Barrett for STB Truetype
-- @WerWolv for Tesla library
-- @ppkantorski for Ultrahand Overlay
+- Niels Lohmann <https://nlohmann.me> for JSON C++ library.
+- @SciresM for Atmosphère.
+- Sean Barrett for STB Truetype library.
+- @WerWolv for [Tesla library](https://github.com/WerWolv/libtesla).
+- @ppkantorski for [Ultrahand Overlay](https://github.com/ppkantorski/Ultrahand-Overlay).
 - @tallbl0nde for IPC Server (from TriPlayer)

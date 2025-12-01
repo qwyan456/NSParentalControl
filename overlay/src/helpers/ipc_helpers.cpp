@@ -8,6 +8,8 @@
 namespace alefbet::pctrl::ipc {
     
     using namespace std::chrono;
+    using namespace alefbet::pctrl::logger;
+
     constexpr u8 PIN_LEN_MAX = 20*4+3;
     constexpr u8 ACC_USER_NICKNAME_MAX = 0x20;
 
@@ -16,30 +18,28 @@ namespace alefbet::pctrl::ipc {
     }
 
     void startTest() {
-        logToFile("[IPC] starting test");
+        logInfo("[IPC] starting test\n");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return;
         }
             
         auto& service = getAppContext().pctrl_service;
         Result res = serviceDispatch(&service, (u32)Ipc::Command::Test); 
         if(R_FAILED(res)) {
-            logToFile("[IPC] serviceDispatch failed");
-            logIntToFile(R_MODULE(res));
-            logIntToFile(R_DESCRIPTION(res));
+            logError("[IPC] serviceDispatch failed (%i.%i)\n", R_MODULE(res), R_DESCRIPTION(res));
             return;
         }
 
-        logToFile("[IPC] service dispatch OK");
+        logDebug("[IPC] service dispatch OK\n");
     }
     
     UserUid getCurrentUserUid() {
-        logToFile("[IPC] Get current user Uid");
+        logDebug("[IPC] Get current user Uid\n");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return "";
         }
 
@@ -51,8 +51,7 @@ namespace alefbet::pctrl::ipc {
         }
 
         UserUid user_id = UserUid(currentUser);
-        logToFile("Recv uid = ");
-        logToFile(user_id.c_str());
+        logDebug("Recv uid = %s\n", user_id.c_str());
         if(user_id == "(NULL)") {
             return "";
         }
@@ -61,10 +60,10 @@ namespace alefbet::pctrl::ipc {
     }
 
     UserNickname getCurrentUserNickname() {
-        logToFile("[IPC] Get current user Nickname");
+        logDebug("[IPC] Get current user Nickname\n");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return "";
         }
 
@@ -84,14 +83,14 @@ namespace alefbet::pctrl::ipc {
     }
 
     std::string getCurrentTitle() {
-        logToFile("[IPC] Get current title");
+        logDebug("[IPC] Get current title\n");
 
         /*logToFile("Test"); 
         std::string _name = helpers::getTitleName(418111488);
         logToFile(_name.c_str());*/
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return "";
         }
 
@@ -111,10 +110,10 @@ namespace alefbet::pctrl::ipc {
     }
 
     minutes getUserUsageTime(const AccountUid& accountUid) {
-        logToFile("[IPC] Get usage time for the user");
+        logDebug("[IPC] Get usage time for the user\n");
                 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return minutes(0);
         }
 
@@ -124,28 +123,28 @@ namespace alefbet::pctrl::ipc {
         UserUid uid = accountUidToString(accountUid);
 
         if(!accountUidIsValid(&accountUid)) {
-            logToFile("Query usage time for current user");
+            logDebug("Query usage time for current user\n");
             res = serviceDispatchOut(&service, (u32)Ipc::Command::GetUserUsageTime, usageTime);
         } else {
-            logToFile("Query usage time for");
+            
             char _uid[40] = {0};
             std::memcpy(_uid, uid.data(), uid.length());
-            logToFile(_uid);
+            logDebug("Query usage time for uid %i\n", _uid);
             res = serviceDispatchInOut(&service, (u32)Ipc::Command::GetUserUsageTime, _uid, usageTime);
         }
 
         if(R_FAILED(res)) {
-            logToFile("[IPC] An error occured while queriying the usage time for the user");
+            logError("[IPC] An error occured while queriying the usage time for the user\n");
         }
 
         return std::chrono::minutes(usageTime);
     }
 
     minutes getUserRemainingTime(const AccountUid& accountUid) {
-        logToFile("[IPC] Get remaining time for the user");
+        logDebug("[IPC] Get remaining time for the user\n");
         
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return minutes(0);
         }
 
@@ -155,18 +154,18 @@ namespace alefbet::pctrl::ipc {
         Result res = 0;
         
         if(!accountUidIsValid(&accountUid)) {
-            logToFile("Query usage time for current user");
+            logDebug("Query usage time for current user\n");
             res = serviceDispatchOut(&service, (u32)Ipc::Command::GetUserRemainingTime, remainingTime);
         } else {
-            logToFile("Query usage time for");
+            
             char _uid[40] = {0};
             std::memcpy(_uid, uid.data(), uid.length());
-            logToFile(_uid);
+            logDebug("Query usage time for uid %i\n", _uid);
             res = serviceDispatchInOut(&service, (u32)Ipc::Command::GetUserRemainingTime, _uid, remainingTime);
         }
 
         if(R_FAILED(res)) {
-            logToFile("[IPC] An error occured while queriying the remaining time for the user");
+            logError("[IPC] An error occured while queriying the remaining time for the user\n");
         }
 
         return std::chrono::minutes(remainingTime);
@@ -176,18 +175,17 @@ namespace alefbet::pctrl::ipc {
         std::string pin;
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return "";
         }
 
         if(keys.size() != 4) {
-            logToFile("[IPC] The PIN size is wrong.");
+            logError("[IPC] The PIN size is wrong.\n");
             return pin;
         }
 
         pin = std::to_string(keys[0]) +"," +std::to_string(keys[1]) +"," +std::to_string(keys[2]) +"," +std::to_string(keys[3]);
-        logToFile("[IPC] Encoded PIN is");
-        logToFile(pin.c_str());
+        logDebug("[IPC] Encoded PIN is %s", pin.c_str());
 
         return pin;
     }
@@ -215,10 +213,10 @@ namespace alefbet::pctrl::ipc {
     }*/
 
     bool verifyPin(const std::vector<u64>& pin) {
-        logToFile("[IPC] Verify Admin PIN");
+        logDebug("[IPC] Verify Admin PIN\n");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return false;
         }
 
@@ -228,12 +226,11 @@ namespace alefbet::pctrl::ipc {
             pin[0], pin[1], pin[2], pin[3]
         };        
         //std::strncpy(pin_str, pin.c_str(), pin.size());
-        logToFile("PIN");
-        logToFile(encodeAdminPin(pin).c_str());
+        logDebug("PIN = %s\n", encodeAdminPin(pin).c_str());
         Result res = serviceDispatchInOut(&service, (u32)Ipc::Command::VerifyAdminPin, a_pin, verified);
 
         if(R_FAILED(res)) {
-            logToFile("[IPC] An error occured during the Admin PIN verification.");
+            logError("[IPC] An error occured during the Admin PIN verification.\n");
             return false;
         }
 
@@ -241,10 +238,10 @@ namespace alefbet::pctrl::ipc {
     }
 
     bool setupPin(const std::vector<u64>& pin) {
-        logToFile("[IPC] Setup new PIN");
+        logDebug("[IPC] Setup new PIN\n");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return false;
         }
 
@@ -254,12 +251,11 @@ namespace alefbet::pctrl::ipc {
         u64 a_pin[4] = { 
             pin[0], pin[1], pin[2], pin[3]
         }; 
-        logToFile("PIN");
-        logToFile(encodeAdminPin(pin).c_str());
+        logDebug("PIN = %s\n", encodeAdminPin(pin).c_str());
         Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetAdminPin, a_pin);
 
         if(R_FAILED(res)) {
-            logToFile("[IPC] An error occured during the setup of the Admin PIN.");
+            logError("[IPC] An error occured during the setup of the Admin PIN.\n");
             return false;
         }
 
@@ -267,10 +263,10 @@ namespace alefbet::pctrl::ipc {
     }
 
     bool setWorkingMode(const WorkingMode& mode) {
-        logToFile("[IPC] Setting working mode");
+        logDebug("[IPC] Setting working mode\n");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return false;
         }
 
@@ -279,7 +275,7 @@ namespace alefbet::pctrl::ipc {
         Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetWorkingMode, _mode);
 
         if(R_FAILED(res)) {
-            logToFile("[IPC] An error occured while setting up the working mode.");
+            logError("[IPC] An error occured while setting up the working mode.\n");
             return false;
         }
 
@@ -287,10 +283,10 @@ namespace alefbet::pctrl::ipc {
     }
 
     WorkingMode getWorkingMode() {
-        logToFile("[IPC] Getting working mode");
+        logDebug("[IPC] Getting working mode\n");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return WorkingModeBlocking;
         }
 
@@ -300,7 +296,7 @@ namespace alefbet::pctrl::ipc {
         Result res = serviceDispatchOut(&service, (u32)Ipc::Command::GetWorkingMode, workingMode);
 
         if(R_FAILED(res)) {
-            logToFile("[IPC] An error occured while getting the working mode.");
+            logError("[IPC] An error occured while getting the working mode.\n");
         }
 
         switch(workingMode) {
@@ -312,11 +308,10 @@ namespace alefbet::pctrl::ipc {
     }
     
     bool setShowRemainingTime(const bool& active) {
-        logToFile("[IPC] Setting remaining time visibility:");
-        logToFile(active ? "true" : "false");
+        logDebug("[IPC] Setting remaining time visibility: %s\n", active ? "true" : "false");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return false;
         }
 
@@ -324,7 +319,7 @@ namespace alefbet::pctrl::ipc {
         Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetShowRemainingTime, active);
 
         if(R_FAILED(res)) {
-            logToFile("[IPC] An error occured while setting up remaining time visibility.");
+            logError("[IPC] An error occured while setting up remaining time visibility.\n");
             return false;
         }
 
@@ -332,10 +327,10 @@ namespace alefbet::pctrl::ipc {
     }
 
     bool getShowRemainingTime() {
-        logToFile("[IPC] Getting remaining time visibility");
+        logDebug("[IPC] Getting remaining time visibility\n");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return false;
         }
 
@@ -345,7 +340,7 @@ namespace alefbet::pctrl::ipc {
         Result res = serviceDispatchOut(&service, (u32)Ipc::Command::GetShowRemainingTime, visible);
 
         if(R_FAILED(res)) {
-            logToFile("[IPC] An error occured while getting the remaining time visibility.");
+            logError("[IPC] An error occured while getting the remaining time visibility.\n");
         }
 
         return visible == 1 ? true : false;
@@ -353,12 +348,12 @@ namespace alefbet::pctrl::ipc {
 
     bool setEnabled(const bool& enabled) {
         if(enabled)
-            logToFile("[IPC] Setting service enabled");
+            logDebug("[IPC] Setting service enabled\n");
         else 
-            logToFile("[IPC] Setting service disabled");
+            logDebug("[IPC] Setting service disabled\n");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return false;
         }
 
@@ -366,7 +361,7 @@ namespace alefbet::pctrl::ipc {
         Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetEnabled, enabled);
 
         if(R_FAILED(res)) {
-            logToFile("[IPC] An error occured while change the state of the service.");
+            logError("[IPC] An error occured while change the state of the service.\n");
             return false;
         }
 
@@ -374,10 +369,10 @@ namespace alefbet::pctrl::ipc {
     }
 
     bool isEnabled() {
-        logToFile("[IPC] Getting current state of the service");
+        logDebug("[IPC] Getting current state of the service\n");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return false;
         }
 
@@ -387,20 +382,19 @@ namespace alefbet::pctrl::ipc {
         Result res = serviceDispatchOut(&service, (u32)Ipc::Command::IsEnabled, enabled);
 
         if(R_FAILED(res)) {
-            logToFile("[IPC] An error occured while getting the current service state.");
+            logError("[IPC] An error occured while getting the current service state.\n");
         } else {
-            logToFile("[IPC] Service state is");
-            logIntToFile(enabled);
+            logDebug("[IPC] Service state is %s\n", enabled ? "enabled" : "disabled");
         }
 
         return enabled == 1 ? true : false;
     }
  
     std::string getVersion() {
-        logToFile("[IPC] Getting sysmodule version");
+        logDebug("[IPC] Getting sysmodule version\n");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return "";
         }
 
@@ -410,20 +404,19 @@ namespace alefbet::pctrl::ipc {
         Result res = serviceDispatchOut(&service, (u32)Ipc::Command::Version, version);
 
         if(R_FAILED(res)) {
-            logToFile("[IPC] An error occured while getting the sysmodule version.");
+            logError("[IPC] An error occured while getting the sysmodule version.\n");
         } 
 
-        logToFile("[IPC] Sysmodule version is");
-        logToFile(version);
+        logDebug("[IPC] Sysmodule version is %s\n", version);
 
         return std::string(version);
     }
 
     u16 getDailyLimit() {
-        logToFile("[IPC] Getting daily limit");
+        logDebug("[IPC] Getting daily limit\n");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return 0;
         }
 
@@ -433,20 +426,19 @@ namespace alefbet::pctrl::ipc {
         Result res = serviceDispatchOut(&service, (u32)Ipc::Command::GetDailyLimit, limit);
 
         if(R_FAILED(res)) {
-            logToFile("[IPC] An error occured while getting the daily limit.");
+            logError("[IPC] An error occured while getting the daily limit.\n");
         } 
 
-        logToFile("[IPC] Daily limit is");
-        logIntToFile(limit);
+        logDebug("[IPC] Daily limit is %i\n", limit);
 
         return limit;
     }
 
     bool setDailyLimit(const u16& limit) {
-        logToFile("[IPC] Setting the daily limit");
+        logDebug("[IPC] Setting the daily limit\n");
 
         if(!isAvailable()) {
-            logToFile("[IPC] service not available");
+            logError("[IPC] service not available\n");
             return false;
         }
 
@@ -454,11 +446,96 @@ namespace alefbet::pctrl::ipc {
         Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetDailyLimit, limit);
 
         if(R_FAILED(res)) {
-            logToFile("[IPC] An error occured while setting the daily limit.");
+            logError("[IPC] An error occured while setting the daily limit.\n");
             return false;
         }
 
         return true;
     }
 
+    bool isDebugLogEnabled() {
+        logDebug("[IPC] Getting log level\n");
+
+        if(!isAvailable()) {
+            logError("[IPC] service not available\n");
+            return 0;
+        }
+
+        u16 level = 0;
+
+        auto& service = getAppContext().pctrl_service;
+        Result res = serviceDispatchOut(&service, (u32)Ipc::Command::GetLogLevel, level);
+
+        if(R_FAILED(res)) {
+            logError("[IPC] An error occured while getting the daily limit.\n");
+        } 
+
+        logDebug("[IPC] Log level is %i\n", level);
+
+        return level == DEBUG;
+    }
+
+    bool enableDebugLog(bool enable) {
+        logDebug("[IPC] Setting log level\n");
+
+        if(!isAvailable()) {
+            logError("[IPC] service not available\n");
+            return false;
+        }
+
+        auto& service = getAppContext().pctrl_service;
+        const u8 level = enable ? DEBUG : INFO;
+        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetLogLevel, level); 
+
+        if(R_FAILED(res)) {
+            logError("[IPC] An error occured while setting the log level to DEBUG.\n");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool isDatabaseTampered() {
+        logDebug("[IPC] Verifying whether database has been tampered\n");
+
+        if(!isAvailable()) {
+            logError("[IPC] service not available\n");
+            return 0;
+        }
+
+        u8 tampered = 0;
+
+        auto& service = getAppContext().pctrl_service;
+        Result res = serviceDispatchOut(&service, (u32)Ipc::Command::IsTampered, tampered);
+
+        if(R_FAILED(res)) {
+            logError("[IPC] An error occured while getting the tampered state.\n");
+        } 
+
+        logDebug("[IPC] Tampered state is %i\n", tampered ? "tampered" : "clean");
+
+        return tampered != 0;
+    }
+
+    bool isDatabaseNeedsUpgrade() {
+        logDebug("[IPC] Verifying whether database needs upgrade\n");
+
+        if(!isAvailable()) {
+            logError("[IPC] service not available\n");
+            return 0;
+        }
+
+        u8 mustUpgrade = 0;
+
+        auto& service = getAppContext().pctrl_service;
+        Result res = serviceDispatchOut(&service, (u32)Ipc::Command::MustUpgradeDatabase, mustUpgrade);
+
+        if(R_FAILED(res)) {
+            logError("[IPC] An error occured while getting the tampered state.\n");
+        } 
+
+        logDebug("[IPC] Needs upgrade is %i\n", mustUpgrade ? "true" : "false");
+
+        return mustUpgrade != 0;
+    }    
 }

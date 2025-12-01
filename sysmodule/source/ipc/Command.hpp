@@ -23,7 +23,11 @@ namespace Ipc {
         IsEnabled,                  /*! Returns the current state of the parental control service. Returns 1 if the service is enabled. */
         SetEnabled,                 /*! Sets the state of the parental control service. 1 to enable the service. 0 to disable. */
         GetDailyLimit,              /*! Returns the current setting of the daily limit in minutes. */
-        SetDailyLimit               /*! Sets the daily limit in minutes. */
+        SetDailyLimit,              /*! Sets the daily limit in minutes. */
+        SetLogLevel,                /*! Sets the log level */
+        GetLogLevel,                /*! Returns the current log level */
+        IsTampered,                 /*! Returns true if the database or the settings have been modified externally */
+        MustUpgradeDatabase         /*! Returns true if the database must be upgraded */
     };
 
 
@@ -49,6 +53,10 @@ namespace Ipc {
             case Command::SetEnabled: return "SetEnabled";
             case Command::GetDailyLimit: return "GetDailyLimit";
             case Command::SetDailyLimit: return "SetDailyLimit";
+            case Command::SetLogLevel: return "SetLogLevel";
+            case Command::GetLogLevel: return "GetLogLevel";
+            case Command::IsTampered: return "IsTampered";
+            case Command::MustUpgradeDatabase: return "MustUpgradeDatabase";
             default: return "Unknown";
         }
     };
