@@ -502,7 +502,7 @@ namespace alefbet::pctrl::database {
 
             data_settings[fileSize] = '\0';
 
-            logDebug("[Database] Settings data: %s\n", data_settings);
+            //logDebug("[Database] Settings data: %s\n", data_settings);
             logDebug("[Database] Parse settings file\n");
             json j_settings = json::parse(data_settings);
 

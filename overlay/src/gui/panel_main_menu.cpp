@@ -87,9 +87,14 @@ void MainMenuPanel::rebuildUI() {
     auto currentTitle = ipc::getCurrentTitle();
     logDebug("title=%s\n", currentTitle.c_str());
 
-    if(!currentTitle.empty() && !currentTitle.starts_with("Err#")) {
-        auto currentUserUid = ipc::getCurrentUserUid();
-        logDebug("user id=%s\n", currentUserUid.c_str());
+    auto currentUserUid = ipc::getCurrentUserUid();
+    logToFile("userId=");
+    logToFile(currentUserUid.c_str());
+
+    if(!currentTitle.empty() && !currentTitle.starts_with("Err#") && !currentUserUid.empty()) {
+        
+        logToFile("user id=");
+        logToFile(currentUserUid.c_str());
 
         auto currentUserNickname = ipc::getCurrentUserNickname();        
         logDebug("user name=%s\n", currentUserNickname.c_str());        
