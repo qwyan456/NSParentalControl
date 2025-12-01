@@ -66,7 +66,7 @@ Versions
   Sysmodule             v1.2
 ```
 
-- `Enabled` is a switch for enabling and disabling the parental control. When it disabled it does not count play time anymore.
+- `Enabled` is a switch for enabling and disabling the parental control. When disabled it does not count play time anymore.
 - `Working mode` lets you define whether the system will be blocked at the end of play time or the play time is only shown on screen as a badge (Currently the only value is `Blocking`).
 - `Notify remaining time` is a switch for enabling notifications about the remaining time. When enabled, a notification is shown every 15 minutes, and every minute during the last 5 minutes. **This feature is only available when Ultrahand overlay is used**.
 - `Log level` lets you define the log level to DEBUG or INFO in the sysmodule and the overlay. Use DEBUG only when needed because it can generates big files.
