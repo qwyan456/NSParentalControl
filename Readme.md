@@ -16,6 +16,10 @@ The user manual can be found [here](docs/manual.md).
 
 ## Dependencies
 
+**Needs a CFW (Atmosphère).**
+
+**Tested with AMS 1.9.4 with FW 20.3.0**
+
 Linked with:
 - libnx 4.10.0 
 - libultrahand 2.2.0
