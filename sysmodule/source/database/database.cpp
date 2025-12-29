@@ -28,12 +28,15 @@ static const char* SETTINGS_FILENAME = "/config/parental_control/settings.json";
 namespace alefbet::pctrl::database {
     static FsFileSystem sdmc_;
     static FsFile handle_settings_;
-    static std::mutex mutex_settings_;
     static FsFile handle_database_;
+    static FsFile handle_passwords_;
+    static std::mutex mutex_settings_;    
     static std::mutex mutex_database_;
+    static std::mutex mutex_passwords_;
     static bool ready_ = false;
     static bool data_synchronized_ = false; // The data are synchronized between the cache and the file
     static bool settings_synchronized_ = false; 
+    static bool passwords_synchronized_ = false; 
     static History history_;
     static Settings settings_;
     static bool mustUpgrade_ = false;
@@ -236,8 +239,7 @@ namespace alefbet::pctrl::database {
 
         if(!prepare()) return;
 
-        bool opened = R_SUCCEEDED(fsFsOpenFile(&sdmc_, DB_FILENAME, FsOpenMode_Read, &handle_database_));
-        History history;
+        bool opened = R_SUCCEEDED(fsFsOpenFile(&sdmc_, DB_FILENAME, FsOpenMode_Read, &handle_database_));        
 
         if(!opened) {
             logError("Could not open database file. Try to create a new file.\n");
@@ -308,7 +310,7 @@ namespace alefbet::pctrl::database {
 
             std::vector<json> j_entries = j_data["history"].get<std::vector<json>>();            
 
-            for(const auto& j_entry: j_entries) {
+            for(const auto& j_entry: j_entries) {                
                 auto uidAsString = j_entry["uid"].get<std::string>();
                 auto date = j_entry["date"].get<std::string>();
                 auto titleId = j_entry["title_id"].get<u64>();
@@ -316,23 +318,23 @@ namespace alefbet::pctrl::database {
                 auto uid = accountUidFromString(uidAsString);
 
                 HistoryEntry entry(uid, date, titleId, durationInMinutes);
-                history.addEntry(entry);
+                history_.addEntry(entry);
             }
 
             fsFileClose(&handle_database_);
             delete[] data;
-        }
 
-        data_synchronized_ = true;
+            data_synchronized_ = true;
+        }        
     }
 
-    void saveDatabase(const History& history) {
+    void saveDatabase() {
         std::lock_guard<std::mutex> lock(mutex_database_);
 
         if(!prepare()) return;
 
         json j_entries;
-        for(const auto& entry: history.entries()) {
+        for(const auto& entry: history_.entries()) {
             json j_entry = json::object( {
                 { "uid", entry.uidAsString() },
                 { "date", entry.date() },
@@ -361,7 +363,7 @@ namespace alefbet::pctrl::database {
             logError("[Database] Could not create the database file\n");
             return;
         } else {
-            logInfo("[Database] New database file created\n");
+            logDebug("[Database] New database file created\n");
         }
 
         if(R_FAILED(fsFsOpenFile(&sdmc_, DB_FILENAME, FsOpenMode_Write | FsOpenMode_Append, &handle_database_))) {
@@ -404,7 +406,7 @@ namespace alefbet::pctrl::database {
         std::string uidToString = accountUidToString(uid);
 
         //Get current history
-        loadDatabase();
+        //loadDatabase();
 
         const auto& date = today();
         if(date.empty()) {
@@ -428,7 +430,7 @@ namespace alefbet::pctrl::database {
             result = entry;
         }
 
-        saveDatabase(history_);
+        saveDatabase();
         return result;
     }
 
@@ -455,7 +457,7 @@ namespace alefbet::pctrl::database {
                 }
             }
 
-            saveSetting(Setting {
+            /*saveSetting(Setting {
                 .key = SETTING_DAILY_LIMIT_GAME,
                 .type = INTEGER,
                 .int_value = 1*60 //Default: 1 hour
@@ -465,6 +467,11 @@ namespace alefbet::pctrl::database {
                 .key = SETTING_DAILY_LIMIT_GLOBAL,
                 .type = INTEGER,
                 .int_value = 1*60 //Default: 1 hour
+            });*/
+            saveSetting(Setting {
+                .key = SETTING_ENABLED,
+                .type = INTEGER,
+                .int_value = 1
             });
         } else {
             s64 fileSize = 0;
@@ -502,7 +509,7 @@ namespace alefbet::pctrl::database {
 
             data_settings[fileSize] = '\0';
 
-            //logDebug("[Database] Settings data: %s\n", data_settings);
+            logDebug("[Database] Settings data: %s\n", data_settings);
             logDebug("[Database] Parse settings file\n");
             json j_settings = json::parse(data_settings);
 
@@ -526,7 +533,10 @@ namespace alefbet::pctrl::database {
                             case INTEGER: setting.int_value = j_setting["value"].get<u64>(); break;
                             case DOUBLE: setting.double_value = j_setting["value"].get<double>(); break;
                             case STRING: {
-                                setting.encrypted = j_setting["encrypted"].get<bool>();
+                                if(j_setting.contains("encrypted")) {
+                                    setting.encrypted = j_setting["encrypted"].get<bool>();                                    
+                                }
+                                   
                                 const auto& val = j_setting["value"].get<std::string>();
                                 if(setting.encrypted) {
                                     const auto& decrypted = crypto::decodeValue(val);
