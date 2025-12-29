@@ -114,9 +114,9 @@ Here are the files and their destination:
 
 | File | Destination | Description |
 |--|--|--|
-| exefs.nsp | /atmosphere/contents/420000000003103 | The core of the system as a *sysmodule* |
-| toolbox.json | /atmosphere/contents/420000000003103 | A description file for Atmosphère |
-| boot2.flag | /atmosphere/contents/420000000003103/flags | Mandatory file to make the sysmodule start at boot |
+| exefs.nsp | /atmosphere/contents/4200000000003103 | The core of the system as a *sysmodule* |
+| toolbox.json | /atmosphere/contents/4200000000003103 | A description file for Atmosphère |
+| boot2.flag | /atmosphere/contents/4200000000003103/flags | Mandatory file to make the sysmodule start at boot |
 | parental_control.ovl | /switch/.overlays | The overlay |
 
 After copying the files, reboot the console.
@@ -156,7 +156,7 @@ Go to the directory `NSParentalControl/sysmodule`
 
 Run the command `$ make`. At the end of the build, the `out.nosync` directory contains the file `exefs.nsp`.
 
-This file should be copied in the directory `/atmosphere/contents/420000000003103` of the SD card of the Switch.
+This file should be copied in the directory `/atmosphere/contents/4200000000003103` of the SD card of the Switch.
 
 ### Build the overlay
 
@@ -168,7 +168,7 @@ Copy this file in the directory `/switch/.overlays/` in the SD card of the Switc
 
 ### Auto-start Parental Control
 
-In order for the parental control to load on startup you have to create a new folder named `flags` into `/atmosphere/contents/420000000003103`. 
+In order for the parental control to load on startup you have to create a new folder named `flags` into `/atmosphere/contents/4200000000003103`. 
 
 In this folder create an empty file named `boot2.flag`.
 

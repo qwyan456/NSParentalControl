@@ -1,0 +1,6 @@
+{
+	"name"  : "ParentalControl",
+	"tid"   : "4200000000003103",
+	"requires_reboot": false,
+	"version": "1.2.2"
+}
