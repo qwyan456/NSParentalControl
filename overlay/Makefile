@@ -39,13 +39,13 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 
 APP_TITLE			:=		Parental Control
-APP_VERSION 	:= 		1.2
+APP_VERSION 	:= 		1.3
 
 TARGET		:=	parental_control
 BUILD		:=	build
 SOURCES		:=	src src/gui src/helpers
 DATA		:=	data
-INCLUDES	:=	include include/gui include/helpers ../libtesla/include
+INCLUDES	:=	src src/gui src/helpers
 
 NO_ICON		:=  1
 
@@ -59,7 +59,7 @@ ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 CFLAGS	:=	-g -Wall -O2 -ffunction-sections -fdata-sections -flto \
 			$(ARCH) $(DEFINES)
 
-CFLAGS	+=	$(INCLUDE) -D__SWITCH__
+CFLAGS	+=	$(INCLUDE) -D__SWITCH__ -DVERSION=\"v$(APP_VERSION)\"
 
 CXXFLAGS	:= $(CFLAGS) -fno-exceptions -std=c++20 -ffunction-sections -fdata-sections -flto
 

@@ -2,13 +2,12 @@
 //#include <tesla.hpp>
 #include <switch.h>
 #include <chrono>
-#include "version.h"
 #include "logger.h"
 #include "Command.hpp"
 #include "panel_debug_menu.h"
 #include "panel_admin_menu.h"
 #include "panel_verifypin.h"
-#include "panel_setup_limits.h"
+#include "panel_setup_limits_main.h"
 #include "panel_history_main.h"
 #include "AppContext.h"
 #include "helpers/ipc_helpers.h"
@@ -59,8 +58,8 @@ void MainMenuPanel::rebuildUI() {
     const auto& dbTampered = ipc::isDatabaseTampered();
     const auto& mustUpgrade = ipc::isDatabaseNeedsUpgrade();
     specialMessages = dbTampered || mustUpgrade;
+
     if(specialMessages) {
-        //rootList_->addItem(new tsl::elm::CategoryHeader("Warnings"));
         rootList_->addItem(new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *r, s32 x, s32 y, s32 width, s32 height) {
                 r->drawString(" ", false, x, y, 22, tsl::Color(0xffff));
             }), 30);
@@ -121,27 +120,7 @@ void MainMenuPanel::rebuildUI() {
         rootList_->addItem(entryRemainingTime);        
     } else {
         rootList_->addItem(new tsl::elm::ListItem("No user / app started"));
-    }        
-
-    if(false) { // Disabled
-        const auto& remainingTimeVisibility = ipc::getShowRemainingTime();
-        auto entryShowRemainingTime = new tsl::elm::ToggleListItem("Remaining time visible", remainingTimeVisibility);
-        rootList_->addItem(entryShowRemainingTime);
-        entryShowRemainingTime->setClickListener([this, entryShowRemainingTime](u64 keys) -> bool {
-            if(keys & HidNpadButton_A) {            
-                bool res = ipc::setShowRemainingTime(entryShowRemainingTime->getState());
-                if(!res) {
-                    entryShowRemainingTime->setState(!entryShowRemainingTime->getState());
-                } else {
-                    dirty_ = true;
-                }
-                
-                return true;
-            }
-
-            return false;
-        }); 
-    }
+    }            
 
     // History
     auto entryShowHistory = new tsl::elm::ListItem("Usage history");

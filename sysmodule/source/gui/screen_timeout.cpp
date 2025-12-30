@@ -47,11 +47,6 @@ namespace alefbet::pctrl::gui {
         return tmp_pos / 2;
     }
 
-    void ScreenTimeout::setTransferMemory(u8* memory, u64 size) {
-        g_nv_transfer_memory = memory;
-        nv_transfer_memory_size = size;
-    }
-
     void ScreenTimeout::InitializeFrameBufferPointer() {
         void* mem = aligned_alloc(0x1000, FrameBufferRequiredSizePageAligned);
         if(mem == nullptr) {
@@ -130,26 +125,26 @@ namespace alefbet::pctrl::gui {
         SetupDisplayExternal();
 
         /* Open the default display. */
-        TRY_AND_RETURN(
+        TRY_AND_RETURN_2(
             viOpenDefaultDisplay(std::addressof(m_display)), 
             "[Screen] Could not open default display. Aborting.\n"
         )
 
         /* Reset the display magnification to its default value. */
         s32 display_width, display_height;
-        TRY_AND_RETURN(
+        TRY_AND_RETURN_2(
             viGetDisplayLogicalResolution(std::addressof(m_display), std::addressof(display_width), std::addressof(display_height)),
             "[Screen] Could not get display logical resolution.\n"
         )
  
         /* Magnify */
-        TRY_AND_RETURN(
+        TRY_AND_RETURN_2(
             viSetDisplayMagnification(std::addressof(m_display), 0, 0, display_width, display_height),
             "[Screen] Could not reset display magnification.\n"
         )
 
         /* Create layer to draw to. */
-        TRY_AND_RETURN(
+        TRY_AND_RETURN_2(
             viCreateLayer(std::addressof(m_display), std::addressof(m_layer)),
             "[Screen] Could not create layer.\n"
         )
@@ -169,30 +164,30 @@ namespace alefbet::pctrl::gui {
             const float layer_x = static_cast<float>((display_width - LayerWidth) / 2);
             const float layer_y = static_cast<float>((display_height - LayerHeight) / 2);
 
-            TRY_AND_RETURN(
+            TRY_AND_RETURN_2(
                 viSetLayerSize(std::addressof(m_layer), LayerWidth, LayerHeight),
                 "[Screen] Could not set layer size.\n"
             )
 
             /* Set the layer's Z at display maximum, to be above everything else .*/
-            TRY_AND_RETURN(
+            TRY_AND_RETURN_2(
                 viSetLayerZ(std::addressof(m_layer), PctrlLayerZ),
                 "[Screen] Could not set layer z position.\n"
             )
 
             /* Center the layer in the screen. */
-            TRY_AND_RETURN(
+            TRY_AND_RETURN_2(
                 viSetLayerPosition(std::addressof(m_layer), layer_x, layer_y),
                 "[Screen] Could not set layer position.\n"
             )
 
             /* Create framebuffer. */
-            TRY_AND_RETURN(
+            TRY_AND_RETURN_2(
                 nwindowCreateFromLayer(std::addressof(m_win), std::addressof(m_layer)),
                 "[Screen] Could not create nwindow from layer.\n"
             )
 
-            TRY_AND_RETURN(
+            TRY_AND_RETURN_2(
                 InitializeNativeWindow(),
                 "[Screen] Could not initialize native window.\n"
             )
@@ -209,14 +204,9 @@ namespace alefbet::pctrl::gui {
         if(g_framebuffer_pointer == nullptr) {
             logError("[Screen] The framebuffer pointer is null. Aborting.\n");
             return;
-        }
-
-        /* Temporarily use the NV transfer memory as font backing heap. */
-        //font::SetHeapMemory(g_nv_transfer_memory, sizeof(g_nv_transfer_memory));        
+        }  
         
         PreRenderContents();
-
-        std::memset(g_nv_transfer_memory, 0, nv_transfer_memory_size);
     }
 
     ::Result ScreenTimeout::PreRenderContents() {
@@ -271,23 +261,23 @@ namespace alefbet::pctrl::gui {
         logDebug("[Screen] InitializeNativeWindow\n");
 
         //* Setup nv driver. */
-        TRY_AND_RETURN(
+        TRY_AND_RETURN_2(
             nvInitialize(),
             "[Screen] Could not initialize NV service\n"
         )
 
-        TRY_AND_RETURN(
+        TRY_AND_RETURN_2(
             nvMapInit(),
             "[Screen] Could not init Map\n"
         )
 
-        TRY_AND_RETURN(
+        TRY_AND_RETURN_2(
             nvFenceInit(),
             "[Screen] Could not init fence\n"
         )
 
         /* Create nvmap. */
-        TRY_AND_RETURN(
+        TRY_AND_RETURN_2(
             nvMapCreate(std::addressof(m_map), g_framebuffer_pointer, FrameBufferRequiredSizeBytes, 0x20000, NvKind_Pitch, true),
             "[Screen] Could not create Map\n"
         )
@@ -316,7 +306,7 @@ namespace alefbet::pctrl::gui {
             grbuf.planes[0].size                = FrameBufferRequiredSizeBytes;
             grbuf.planes[0].offset              = 0;            
 
-            TRY_AND_RETURN(
+            TRY_AND_RETURN_2(
                 nwindowConfigureBuffer(std::addressof(m_win), 0, std::addressof(grbuf)),
                 "[Screen] Could not configure nwindow buffer\n"
             )
@@ -332,25 +322,22 @@ namespace alefbet::pctrl::gui {
 
         logDebug("[Screen] Before nwindowDequeueBuffer\n");
         ::Result res = nwindowDequeueBuffer(std::addressof(m_win), std::addressof(slot), nullptr);
-        if(res != 0) {
-            logError("[Screen] Could not dequeue buffer for nwindow\n");
+        if(R_FAILED(res)) {
+            logError("[Screen] Could not dequeue buffer for nwindow: %i:%i\n", R_MODULE(res), R_DESCRIPTION(res));
             return;
         }
-
-        logDebug("[Screen] Before dd:FlushDataCache\n");
-        //dd::FlushDataCache(g_framebuffer_pointer, FrameBufferRequiredSizeBytes);
-        //svcFlushProcessDataCache(0xFFFF8001, reinterpret_cast<uintptr_t>(g_framebuffer_pointer), FrameBufferRequiredSizeBytes);
-        armDCacheFlush(g_framebuffer_pointer, FrameBufferRequiredSizeBytes);
-        logDebug("[Screen] After dd::FlushDataCache\n");
+        
+        armDCacheFlush(g_framebuffer_pointer, FrameBufferRequiredSizeBytes);        
         res = nwindowQueueBuffer(std::addressof(m_win), m_win.cur_slot, NULL);
+
         if(R_FAILED(res)) {
             logError("[Screen timeout] Coulr not dequeue window buffer: %i.%i\n", R_MODULE(res), R_DESCRIPTION(res));
         }
     }
 
     ::Result ScreenTimeout::ShowScreenTimeout() {
-        logDebug("[Screen] Show timeout screen\n");
-        
+        logDebug("[Screen] Show timeout screen\n");       
+
         /* Pre-render the framebuffer. */
         this->PreRenderFrameBuffer();
 

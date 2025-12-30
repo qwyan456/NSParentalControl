@@ -46,25 +46,31 @@ namespace alefbet::pctrl::srv {
 
             // Handlers            
             Ipc::Result getRunningApplication(Ipc::Request*);
+            
             Ipc::Result getCurrentUserUid(Ipc::Request*);
-            Ipc::Result getCurrentUserNickname(Ipc::Request*);
-            Ipc::Result getUsersList(Ipc::Request*);
+            Ipc::Result getCurrentUserNickname(Ipc::Request*);       
+            
             Ipc::Result getUserUsageTime(Ipc::Request*);
             Ipc::Result getUserRemainingTime(Ipc::Request*);
-            Ipc::Result setUserLimits(Ipc::Request*);
+            Ipc::Result setUserDailyLimit(Ipc::Request*);
+            Ipc::Result getUserDailyLimit(Ipc::Request*);
+
             Ipc::Result setAdminPin(Ipc::Request*);
             Ipc::Result verifyAdminPin(Ipc::Request*);
+
             Ipc::Result setWorkingMode(Ipc::Request*);
             Ipc::Result getWorkingMode(Ipc::Request*);
+            
             Ipc::Result setShowRemainingTime(Ipc::Request*);
             Ipc::Result getShowRemainingTime(Ipc::Request*);
+            
             Ipc::Result isEnabled(Ipc::Request*);
             Ipc::Result setEnabled(Ipc::Request*);
+            
             Ipc::Result getCurrentVersion(Ipc::Request*);
-            Ipc::Result getDailyLimit(Ipc::Request*);
-            Ipc::Result setDailyLimit(Ipc::Request*);
             Ipc::Result setLogLevel(Ipc::Request*);
             Ipc::Result getLogLevel(Ipc::Request*);
+            
             Ipc::Result isDatabaseTampered(Ipc::Request*);
             Ipc::Result isMustUpgradeDatabase(Ipc::Request*);
 

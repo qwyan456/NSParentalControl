@@ -41,13 +41,15 @@ namespace alefbet::pctrl::ipc {
     bool getShowRemainingTime();
     bool isEnabled();
     bool setEnabled(const bool&);
-    u16 getDailyLimit();
-    bool setDailyLimit(const u16&);
+    
+    u16 getDailyLimit(const UserData& user);
+    bool setDailyLimit(const UserData& user, u16 limit);
+
     bool isDebugLogEnabled();
     bool enableDebugLog(bool enable);
 
     std::string getVersion();    
 
     bool isDatabaseTampered();
-    bool isDatabaseNeedsUpgrade();
+    bool isDatabaseNeedsUpgrade();    
 }

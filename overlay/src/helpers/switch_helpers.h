@@ -15,7 +15,6 @@ namespace alefbet {
                 UserNickname nickname;
 
                 bool isValid() const {
-                    //return uid.uid[0] > 0 && uid.uid[1] > 0 && !nickname.empty() && nickname.substr(0, 4) != "ERR#";
                     return accountUidIsValid(&uid) && nickname.substr(0, 4) != "ERR#";
                 }
             } UserData;
@@ -25,7 +24,7 @@ namespace alefbet {
             UserUid accountUidToString(AccountUid uid);
             AccountUid accountUidFromString(const UserUid& uid);
 
-            //std::string getTitleName(u64 titleId);
+            std::string getTitleName(u64 titleId);
         }
     }
 }

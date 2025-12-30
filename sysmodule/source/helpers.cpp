@@ -4,15 +4,21 @@
 #include <cinttypes>
 #include <iostream>
 #include <vector>
+#include <list>
 #include <string_view>
 #include <ranges>
 #include <codecvt>
 #include <switch.h>
+#include <algorithm>
 #include "logger.h"
+#include "database/database.h"
 #include "ams_bpc.h"
+#include "database/json.hpp"
 
 using namespace alefbet::pctrl::logger;
 using namespace alefbet::pctrl::structs;
+using namespace alefbet::pctrl::database;
+using namespace nlohmann;
 using std::operator""sv;
 
 namespace alefbet::pctrl::helpers {
@@ -273,7 +279,6 @@ namespace alefbet::pctrl::helpers {
     }
 
     #define IRAM_PAYLOAD_MAX_SIZE 0x24000
-    //static u8 g_reboot_payload[IRAM_PAYLOAD_MAX_SIZE];
     bool rebootToPayload() {
         logInfo("[Helpers] Try to reboot to payload\n");
       
@@ -343,4 +348,224 @@ namespace alefbet::pctrl::helpers {
 
         return true;
     }
+
+    bool isCurrentTitleBlacklisted() {
+        logDebug("[Helpers] Checking whether the current title is blacklisted\n");
+
+        const auto& user = getCurrentUser();
+        u64 pid = getRunningApplicationPid();
+
+        if(pid > 0) {
+            const auto& titleId = getRunningApplicationTitleId(pid);
+
+            if(titleId > 0) {
+                const auto& userId = accountUidToString(user.uid);
+                const auto& blacklist = getBlacklistedTitlesForUser(userId);
+
+                const auto& val = std::find_if(blacklist.begin(), blacklist.end(), [titleId](const u64& title) {
+                    return titleId == title;
+                });
+
+                return val != blacklist.end();
+            }
+        }
+
+        return false;
+    }
+
+    /*!
+        \brief Returns the list of blacklisted titles for a user
+    */
+    std::vector<u64> getBlacklistedTitlesForUser(const std::string& userId) {
+        std::vector<u64> titles;
+
+        auto& settings = loadSettings();
+        if(settings.contains(SETTING_BLACKLIST)) {
+            const auto& blacklist = settings[SETTING_BLACKLIST].string_value;
+
+            if(blacklist.empty()) {
+                logDebug("[Helpers] No title blacklisted for user %s\n", userId.c_str());
+                return titles;
+            }
+
+            json j_blacklist = json::parse(blacklist);
+
+            if(j_blacklist.contains(userId)) {
+                std::vector<u64> j_titlesList = j_blacklist[userId];                
+                return j_titlesList;
+            } else {
+                logDebug("[Helpers] No blacklist for user %s\n", userId.c_str());
+            }
+        }
+
+        return titles;
+    }
+
+    void addToBlacklist(const std::string& userId, u64 titleId) {
+        auto userBlacklist = getBlacklistedTitlesForUser(userId);
+        
+        const auto& title = std::find_if(userBlacklist.begin(), userBlacklist.end(), [titleId](u64 title) {
+            return title == titleId;
+        });
+
+        if(title == userBlacklist.end()) {
+            logDebug("[Database] add title\n");
+            userBlacklist.push_back(titleId);
+        }
+
+        auto& settings = loadSettings();
+
+        if(settings.contains(SETTING_BLACKLIST)) { // The setting exists
+            auto& setting = settings[SETTING_BLACKLIST];
+
+            // We replace the values for the user
+            auto j_setting = json::parse(setting.string_value);
+            j_setting[userId] = userBlacklist;            
+            
+            setting.string_value = j_setting.dump();
+
+            saveSetting(setting);
+        } else { // The setting does not exist 
+            json j_setting;
+            j_setting[userId] = userBlacklist; 
+
+            Setting setting {
+                .key = SETTING_BLACKLIST,
+                .type = STRING,
+                .string_value = j_setting.dump()
+            };
+
+            saveSetting(setting);
+        }
+    }
+        
+    void removeFromBlacklist(const std::string& userId, u64 titleId) {
+        auto userBlacklist = getBlacklistedTitlesForUser(userId);
+
+        const auto& title = std::find_if(userBlacklist.begin(), userBlacklist.end(), [titleId](u64 title) {
+            return title == titleId;
+        });
+
+        if(title == userBlacklist.end()) {
+            logDebug("[Helpers] Title %llu not found in blacklist\n", titleId);
+            return; // Title is not in the blacklist
+        } else {           
+            userBlacklist.erase(std::remove_if(userBlacklist.begin(), userBlacklist.end(), [titleId](u64 title) {
+                if(title == titleId) {
+                    logDebug("[Helpers]  Remove title\n");
+                }
+                return titleId == title;
+            }), userBlacklist.end());
+        }
+
+        auto& settings = loadSettings();
+        
+        if(settings.contains(SETTING_BLACKLIST)) { // The setting exists
+            auto& setting = settings[SETTING_BLACKLIST];
+
+            // We replace the values for the user
+            auto j_setting = json::parse(setting.string_value);
+            j_setting[userId] = userBlacklist;            
+            
+            setting.string_value = j_setting.dump();
+
+            saveSetting(setting);
+        } else { // The setting does not exist 
+            json j_setting;
+            j_setting[userId] = userBlacklist; 
+
+            Setting setting {
+                .key = SETTING_BLACKLIST,
+                .type = STRING,
+                .string_value = j_setting.dump()
+            };
+
+            saveSetting(setting);
+        }        
+    }
+
+    u16 getDailyLimitForUser(const std::string& userId) {
+        auto& settings = loadSettings();
+
+        if(settings.contains(SETTING_DAILY_LIMIT_USERS)) {
+            const auto& limits = settings[SETTING_DAILY_LIMIT_USERS].string_value;
+
+            if(limits.empty()) {
+                logDebug("[Helpers] No daily limit for user %s\n", userId.c_str());
+                return 0;
+            }
+
+            json j_limits = json::parse(limits);
+
+            if(j_limits.contains(userId)) {
+                u16 limit = j_limits[userId].get<u16>();
+                return limit;
+            } else {
+                logDebug("[Helpers] No daily limit for user %s\n", userId.c_str());
+            }
+        }
+
+        return 0;
+    }
+
+    void setDailyLimitForUser(const std::string& userId, u16 limit_in_minutes) {
+        auto& settings = loadSettings();
+
+        if(settings.contains(SETTING_DAILY_LIMIT_USERS)) { // The setting exists
+            auto& setting = settings[SETTING_DAILY_LIMIT_USERS];
+
+            // We replace the value for the user
+            auto j_setting = json::parse(setting.string_value);
+            j_setting[userId] = limit_in_minutes;            
+            
+            setting.string_value = j_setting.dump();
+
+            saveSetting(setting);
+        } else { // The setting does not exist 
+            json j_setting;
+            j_setting[userId] = limit_in_minutes; 
+
+            Setting setting {
+                .key = SETTING_DAILY_LIMIT_USERS,
+                .type = STRING,
+                .string_value = j_setting.dump()
+            };
+
+            saveSetting(setting);
+        }
+    }
+
+    std::string encodePassword(const std::vector<u64>& password) {
+        std::string pin;
+
+        if(password.size() != 4) {
+            logError("[Helpers] The PIN size is wrong.");
+            return pin;
+        }
+
+        pin = std::to_string(password[0]) +"," +std::to_string(password[1]) +"," +std::to_string(password[2]) +"," +std::to_string(password[3]);        
+
+        return pin;    
+    }
+
+    std::vector<u64> decodePassword(const std::string& str) {
+        std::vector<u64> password;
+        password.reserve(4);
+
+        std::stringstream ss(str);
+        std::string part;
+
+        while (std::getline(ss, part, ',')) {
+            password.push_back(static_cast<u64>(std::stoull(part)));
+        }
+
+        if (password.size() != 4) {
+            // Incorrect format
+            logError("[Helpers] The PIN size is wrong.");
+            return {};
+        }
+
+        return password;
+    }
+    
 }

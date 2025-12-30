@@ -28,6 +28,7 @@ namespace alefbet {
                 rc = accountListAllUsers(_users, ACC_USER_LIST_SIZE, &count);
                 if(R_FAILED(rc)) {
                     logError("[Service] Could not enumerate users (%i:%i)\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                    accountExit();
                     return std::list<UserData>{};
                 }
 
@@ -40,7 +41,7 @@ namespace alefbet {
                     rc = accountGetProfile(&profile, uid); 
                     if(rc != 0) {
                         logError("[Helpers] Could not get account profile (%i:%i)\n", R_MODULE(rc), R_DESCRIPTION(rc));
-                        accountExit();                        
+                        continue;
                     } else {
                         logDebug("[Helpers] accountGetProfile() ok\n");
                     }
@@ -49,10 +50,12 @@ namespace alefbet {
                     if(rc != 0) {
                         logError("[Helpers] Could not get user data (%i:%i)\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         accountProfileClose(&profile);
-                        accountExit();                        
-                    } else {
+                        continue;
+                    } else {                        
                         logDebug("[Helpers] accountProfileGet() ok\n");
                     }
+
+                    accountProfileClose(&profile);
 
                     UserData user;
                     user.uid = uid;
@@ -60,7 +63,8 @@ namespace alefbet {
 
                     users.push_back(user);
                 }
-
+                
+                accountExit();
                 return users;
             }
 
@@ -87,29 +91,50 @@ namespace alefbet {
                 return uid;
             }
 
-            /*std::string getTitleName(u64 titleId) {
-                NsApplicationControlData buffer;
-                u64 actual_size = 0;
-                
-                ::Result rc = nsInitialize();
-                if(R_FAILED(rc)) {
-                    logToFile("[Helpers] Failed to connect to ns service");
-                    return "Unknown";
+            std::string getTitleName(u64 titleId) {
+                bool ok = R_SUCCEEDED(nsInitialize());
+                if(!ok) {
+                    logError("[Helpers] Could not initialize NS service\n");
+                    return "Error #11";
                 }
 
-                rc = nsGetApplicationControlData(NsApplicationControlSource_Storage, titleId, std::addressof(buffer), sizeof(buffer), &actual_size);
-                if(R_FAILED(rc)) {
-                    logToFile("[Helpers] Could not get application control data for title");
-                    logIntToFile(titleId);
+                s32 count = 0;
+                NsApplicationRecord records[100]; 
+                if(ok) {               
+                    ok = R_SUCCEEDED(nsListApplicationRecord(records, sizeof(records), 0, &count));
+                } 
+
+                if(!ok) {
+                    logError("[Helpers] Could not get application record count\n");
                     nsExit();
-                    return "Unknown";
+                    return "Error #12";                    
+                }
+
+                NsApplicationControlData nacp;
+                NacpLanguageEntry* langEntry = nullptr;
+                u64 actual_size = 0;
+
+                if(ok) {
+                    ok = R_SUCCEEDED(nsGetApplicationControlData(NsApplicationControlSource_Storage, titleId, &nacp, sizeof(nacp), &actual_size));                    
+
+                    if(!ok) {
+                        logError("[Helpers] Could not get application information for %ull\n", titleId);
+                        nsExit();
+                        return "Error #13";                
+                    } else {                
+                        if(R_SUCCEEDED(nacpGetLanguageEntry(&nacp.nacp, &langEntry)) && langEntry != nullptr) {
+                            nsExit();
+                            return langEntry->name;                            
+                        } else {
+                            nsExit();
+                            return "Error #14";
+                        }                
+                    }
                 }
 
                 nsExit();
-
-                logToFile(buffer.nacp.lang[0].name);
-                return std::string(buffer.nacp.lang[0].name);            
-            }*/
+                return "#NoName#";
+            }
         }
     }
 }
