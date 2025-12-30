@@ -174,7 +174,7 @@ Copy this file in the directory `/switch/.overlays/` in the SD card of the Switc
 
 ### Auto-start Parental Control
 
-In order for the parental control to load on startup you have to create a new folder named `flags` into `/atmosphere/contents/420000000003103`. 
+In order for the parental control to load on startup you have to create a new folder named `flags` into `/atmosphere/contents/4200000000003103`. 
 
 In this folder create an empty file named `boot2.flag`.
 
