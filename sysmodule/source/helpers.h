@@ -63,6 +63,7 @@ namespace alefbet::pctrl {
         u64 getRunningApplicationPid();
         u64 getRunningApplicationTitleId(u64 process_id);
         std::string getApplicationName(u64 title_id);
+        u16 getUserUsageTimeForToday(const AccountUid& uid);
 
         std::string today();
 

@@ -319,9 +319,9 @@ namespace alefbet::pctrl::database {
         if(R_FAILED(fsFsCreateFile(&sdmc_, DB_FILENAME, 0, 0))) {
             logError("[Database] Could not create the database file\n");
             return;
-        } else {
+        } /*else {
             logDebug("[Database] New database file created\n");
-        }
+        }*/
 
         if(R_FAILED(fsFsOpenFile(&sdmc_, DB_FILENAME, FsOpenMode_Write | FsOpenMode_Append, &handle_database_))) {
             logError("[Database] The database file could not be opened for writing\n");
@@ -329,11 +329,12 @@ namespace alefbet::pctrl::database {
         }
 
         const auto stdstr_data = j_history.dump();
-        const auto str_data = stdstr_data.c_str();
-        u64 lenstr = std::strlen(str_data);
+        //const auto str_data = stdstr_data.c_str();
+        u64 lenstr = stdstr_data.length();
         void* s_data = malloc(lenstr+1);
         memset(s_data, 0, lenstr);
-        memcpy(s_data, str_data, lenstr);
+        //memcpy(s_data, str_data, lenstr);
+        std::snprintf((char*)s_data, lenstr, "%s", stdstr_data.c_str());
 
         logDebug("[Database] Writing sessions data %s (size=%i)\n", s_data, lenstr);    
 
@@ -342,6 +343,7 @@ namespace alefbet::pctrl::database {
         }
 
         fsFileClose(&handle_database_);
+        free(s_data);
     }    
 
     std::vector<HistoryEntry> getHistory(AccountUid uid, std::string date) {
@@ -351,6 +353,11 @@ namespace alefbet::pctrl::database {
         return history_.entries(uid, date);
     }
 
+    /*! \brief Adds an entry in the history
+     *
+     * An history entry represents the duration of play for a single title for a single player.
+     * An entry is composed of an account ID, a title ID and the duration of play.
+    */
     HistoryEntry addToHistory(AccountUid uid, u64 titleId, u16 duration_in_minutes) 
     {
         HistoryEntry result;

@@ -67,16 +67,19 @@ namespace alefbet::pctrl::srv {
                 if(user.isValid()) {
                     logDebug("[Monitor] Title %i is currently in used by %s. Updating history.\n", title_id, user.nickname.c_str());                    
 
-                    const auto entry = addToHistory(user.uid, title_id, MainLoopDelayInMinutes.count());                    
+                    const auto& entry = addToHistory(user.uid, title_id, MainLoopDelayInMinutes.count());
 
                     if(!entry.isValid()) {
+                        logError("[Monitor] The database entry is corrupted\n");
                         continue;
                     }
+
+                    const auto totalDuration = getUserUsageTimeForToday(user.uid);                    
 
                     const auto& userId = accountUidToString(user.uid);
                     daily_limit = getDailyLimitForUser(userId);
 
-                    u16 remainingTimeInMinutes = daily_limit > entry.durationInMinutes() ? daily_limit - entry.durationInMinutes() : 0;
+                    u16 remainingTimeInMinutes = daily_limit > totalDuration ? daily_limit - totalDuration : 0;
                     logDebug("[Monitor] Remaining time for user %s is %i minutes. Daily limit=%i\n", user.nickname.c_str(), remainingTimeInMinutes, daily_limit);
 
                     if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {

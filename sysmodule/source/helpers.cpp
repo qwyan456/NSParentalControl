@@ -568,4 +568,15 @@ namespace alefbet::pctrl::helpers {
         return password;
     }
     
+    u16 getUserUsageTimeForToday(const AccountUid& uid) {
+        const auto history = getHistory(uid, today());
+        auto usage_time_in_minutes = (u16)0;        
+
+        // Compute the total usage for today 
+        for(const auto& entry: history) {
+            usage_time_in_minutes += entry.durationInMinutes();
+        }
+
+        return usage_time_in_minutes;
+    }
 }

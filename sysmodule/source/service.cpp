@@ -218,13 +218,7 @@ namespace alefbet::pctrl::srv {
 
         logDebug("[Service] Get usage time for user %s\n", user.nickname.c_str());
 
-        const auto history = getHistory(user.uid, today());
-        auto usage_time_in_minutes = (u16)0;        
-
-        // Compute the total usage for today 
-        for(const auto& entry: history) {
-            usage_time_in_minutes += entry.durationInMinutes();
-        }
+        const auto& usage_time_in_minutes = getUserUsageTimeForToday(user.uid);
 
         logDebug("[Service] User=%s, usage=%i minutes\n", user.nickname.c_str(), usage_time_in_minutes);
 
