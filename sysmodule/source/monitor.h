@@ -1,7 +1,7 @@
 #pragma once
 #include <switch.h>
 #include "database/history.h"
-#include "service.hpp"
+#include "service.h"
 
 namespace alefbet::pctrl::srv {
 
@@ -29,6 +29,7 @@ namespace alefbet::pctrl::srv {
             alefbet::pctrl::srv::Service* service_ = nullptr;
             bool running_ = false;
             bool notified_ = false;
+            u64 currentTitle_ = 0;
     };    
 
 };

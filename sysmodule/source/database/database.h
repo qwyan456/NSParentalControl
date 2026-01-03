@@ -8,9 +8,6 @@
 namespace alefbet::pctrl::database {
 
     /* Files management */
-    /*bool dataDirectoryExists();
-    bool dataFileExists();
-    bool settingsFileExists();*/
     bool createDataDirectory();
 
     /* Data management */

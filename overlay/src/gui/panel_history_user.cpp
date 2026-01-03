@@ -2,7 +2,6 @@
 #include <switch.h>
 #include <chrono>
 #include <string>
-#include "version.h"
 #include "logger.h"
 #include "Command.hpp"
 #include "AppContext.h"

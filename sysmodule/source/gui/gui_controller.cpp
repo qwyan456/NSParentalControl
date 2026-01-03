@@ -8,39 +8,11 @@ using namespace alefbet::pctrl::logger;
 using namespace alefbet::pctrl::gfx;
 using namespace alefbet::pctrl::gui;
 
-namespace images {
-    #include "inc/chrono_0_pc.inc"    
-    #include "inc/chrono_9_pc.inc"
-    #include "inc/chrono_17_pc.inc"
-    #include "inc/chrono_25_pc.inc"
-    #include "inc/chrono_34_pc.inc"
-    #include "inc/chrono_42_pc.inc"
-    #include "inc/chrono_50_pc.inc"
-    #include "inc/chrono_59_pc.inc"
-    #include "inc/chrono_67_pc.inc"
-    #include "inc/chrono_75_pc.inc"
-    #include "inc/chrono_84_pc.inc"
-    #include "inc/chrono_92_pc.inc"
-    #include "inc/chrono_100_pc.inc"
-    #include "inc/chrono_1_mn.inc"
-    #include "inc/chrono_2_mn.inc"
-    #include "inc/chrono_3_mn.inc"
-    #include "inc/chrono_4_mn.inc"
-    #include "inc/chrono_5_mn.inc"
-}
-
-/* There should only be a single transfer memory (for nv). */
-alignas(ams::os::MemoryPageSize) constinit u8 g_nv_transfer_memory[0x40000];
-extern "C" ::Result __nx_nv_create_tmem(TransferMemory *t, u32 *out_size, Permission perm) {
-    *out_size = sizeof(g_nv_transfer_memory);
-    return tmemCreateFromMemory(t, g_nv_transfer_memory, sizeof(g_nv_transfer_memory), perm);
-}
-
 void GuiController::showScreenTimeout() {
     logDebug("[Gui] ShowScreenTimeout\n");
 
     ScreenTimeout *screen = new ScreenTimeout();
-    screen->setTransferMemory(g_nv_transfer_memory, sizeof(g_nv_transfer_memory));
+    //screen->setTransferMemory(g_nv_transfer_memory, sizeof(g_nv_transfer_memory));
     screen->ShowScreenTimeout();
 
     // Instance is not freed because the console will be rebooted

@@ -16,19 +16,10 @@ using namespace alefbet::pctrl::logger;
 constexpr u32 ScreenWidth = 1920;       ///< Width of the Screen
 constexpr u32 ScreenHeight = 1080;      ///< Height of the Screen
 
-/*extern "C" {    
-    alignas(ams::os::MemoryPageSize) constinit u8 g_nv_transfer_memory[0x40000];
-    extern "C" ::Result __nx_nv_create_tmem(TransferMemory *t, u32 *out_size, Permission perm) {
-        *out_size = sizeof(g_nv_transfer_memory);
-        return tmemCreateFromMemory(t, g_nv_transfer_memory, sizeof(g_nv_transfer_memory), perm);
-    }
-}*/
-
 namespace alefbet {
     namespace pctrl {
         namespace gfx {
             extern "C" u64 __nx_vi_layer_id;
-            //u64 _vi_layer_id = 0;
 
             struct Color {
                 union {
@@ -42,32 +33,13 @@ namespace alefbet {
                 constexpr inline Color(u8 r, u8 g, u8 b, u8 a): r(r), g(g), b(b), a(a) {}
             };
 
-            /*static const NvColorFormat g_nvColorFmtTable[] = {
-                NvColorFormat_A8B8G8R8, // PIXEL_FORMAT_RGBA_8888
-                NvColorFormat_X8B8G8R8, // PIXEL_FORMAT_RGBX_8888
-                NvColorFormat_R8_G8_B8, // PIXEL_FORMAT_RGB_888   <-- doesn't work
-                NvColorFormat_R5G6B5,   // PIXEL_FORMAT_RGB_565
-                NvColorFormat_A8R8G8B8, // PIXEL_FORMAT_BGRA_8888
-                NvColorFormat_R5G5B5A1, // PIXEL_FORMAT_RGBA_5551 <-- doesn't work
-                NvColorFormat_A4B4G4R4, // PIXEL_FORMAT_RGBA_4444
-            };
-
-            void* __attribute__((weak)) __libnx_aligned_alloc(size_t alignment, size_t size) {
-                size = (size + alignment - 1) &~ (alignment - 1);
-                return aligned_alloc(alignment, size);
-            }*/
-
             class Renderer {
                 public:
                     static Renderer& get() {
                         static Renderer renderer;
 
                         return renderer;
-                    }                               
-                    
-                    /*void generateAruid() {
-                        aruid_ = 0x1000 + (rand() & 0xFFFFF);
-                    }*/
+                    } 
 
                     bool isInitialized() {
                         return m_initialized;
@@ -86,8 +58,6 @@ namespace alefbet {
                         if (this->m_initialized)
                             return;
 
-                        //generateAruid();
-
                         Result rc = smInitialize();
                         rc = viInitialize(ViServiceType_Manager);
                         logDebug("viInitialize %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
@@ -95,33 +65,13 @@ namespace alefbet {
                         logDebug("viOpenDefaultDisplay %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = viGetDisplayVsyncEvent(&this->m_display, &this->m_vsyncEvent);
                         logDebug("viGetDisplayVsyncEvent %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
-                        //u64 aruid = appletGetAppletResourceUserId();
-                        //logToFile("[Renderer] aruid=%i\n", aruid);
-                        //rc = viCreateManagedLayer(&this->m_display, static_cast<ViLayerFlags>(0), 0, &__nx_vi_layer_id);
                         rc = viCreateLayer(&this->m_display, &this->m_layer);
                         logDebug("__nx_vi_layer_id=%i\n", __nx_vi_layer_id);
                         logDebug("viCreateLayer %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = viSetLayerScalingMode(&this->m_layer, ViScalingMode_FitToLayer);
-                        //rc = viSetLayerScalingMode(&this->m_layer, ViScalingMode_PreserveAspectRatio);
-
-                        /*if (s32 layerZ = 0; R_SUCCEEDED(viGetZOrderCountMax(&this->m_display, &layerZ)) && layerZ > 0) {
-                            rc = viSetLayerZ(&this->m_layer, layerZ);
-                            logDebug("[Renderer] viSetLayerZ %i:%i, layerZ=%i\n", R_MODULE(rc), R_DESCRIPTION(rc), layerZ);
-                        }*/
                         
                         rc = viSetLayerZ(&this->m_layer, 99);
                         logDebug("viSetLayerZ %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
-                        //rc = viAddToLayerStack(&this->m_layer, ViLayerStack_Default);
-                        
-
-                        /*rc = viAddToLayerStack(&this->m_layer, ViLayerStack_Default);
-                        rc = viAddToLayerStack(&this->m_layer, ViLayerStack_Screenshot);
-                        rc = viAddToLayerStack(&this->m_layer, ViLayerStack_Recording);
-                        rc = viAddToLayerStack(&this->m_layer, ViLayerStack_Arbitrary);
-                        rc = viAddToLayerStack(&this->m_layer, ViLayerStack_LastFrame);
-                        rc = viAddToLayerStack(&this->m_layer, ViLayerStack_Null);
-                        rc = viAddToLayerStack(&this->m_layer, ViLayerStack_ApplicationForDebug);
-                        rc = viAddToLayerStack(&this->m_layer, ViLayerStack_Lcd);*/
                         
                         rc = viSetLayerSize(&this->m_layer, LayerWidth, LayerHeight);
                         logDebug("viSetLayerSize %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
@@ -251,58 +201,60 @@ namespace alefbet {
                                 this->setPixelBlendDst(x1, y1, color);
                     }
 
-                    void drawCircle(s32 centerX, s32 centerY, u16 radius, bool filled, Color color) {
-                        s32 x = radius;
-                        s32 y = 0;
-                        s32 radiusError = 0;
-                        s32 xChange = 1 - (radius << 1);
-                        s32 yChange = 0;
+                    /**
+                     * @brief Draws a rectangle of given sizes
+                     *
+                     * @param x X pos
+                     * @param y Y pos
+                     * @param w Width
+                     * @param h Height
+                     * @param color Color
+                     * @param radius Corner radius in pixels
+                     */
+                    inline void drawRect(s32 x, s32 y, s32 w, s32 h, Color color, u16 radius = 0) {
+                        
+                        // minimum radius
+                        if (radius < 0) radius = 0;
+                        if (radius > w/2) radius = w/2;
+                        if (radius > h/2) radius = h/2;
 
-                        while (x >= y) {
-                            if(filled) {
-                                for (s32 i = centerX - x; i <= centerX + x; i++) {
-                                    s32 y0 = centerY + y;
-                                    s32 y1 = centerY - y;
-                                    s32 x0 = i;
+                        const s32 r2 = radius * radius; // rayon² to avoid sqrt()
 
-                                    this->setPixelBlendDst(x0, y0, color);
-                                    this->setPixelBlendDst(x0, y1, color);
+                        for (s32 px = x; px < x + w; px++) {
+                            for (s32 py = y; py < y + h; py++) {
+
+                                bool draw = true;
+
+                                // upper-left corner
+                                if (px < x + radius && py < y + radius) {
+                                    s32 dx = (x + radius) - px;
+                                    s32 dy = (y + radius) - py;
+                                    if (dx*dx + dy*dy > r2) draw = false;
                                 }
 
-                                for (s32 i = centerX - y; i <= centerX + y; i++) {
-                                    s32 y0 = centerY + x;
-                                    s32 y1 = centerY - x;
-                                    s32 x0 = i;
-
-                                    this->setPixelBlendDst(x0, y0, color);
-                                    this->setPixelBlendDst(x0, y1, color);
+                                // upper-right corner
+                                if (px >= x + w - radius && py < y + radius) {
+                                    s32 dx = px - (x + w - radius - 1);
+                                    s32 dy = (y + radius) - py;
+                                    if (dx*dx + dy*dy > r2) draw = false;
                                 }
 
-                                y++;
-                                radiusError += yChange;
-                                yChange += 2;
-                                if (((radiusError << 1) + xChange) > 0) {
-                                    x--;
-                                    radiusError += xChange;
-                                    xChange += 2;
+                                // bottom-left corner
+                                if (px < x + radius && py >= y + h - radius) {
+                                    s32 dx = (x + radius) - px;
+                                    s32 dy = py - (y + h - radius - 1);
+                                    if (dx*dx + dy*dy > r2) draw = false;
                                 }
-                            } else {
-                                this->setPixelBlendDst(centerX + x, centerY + y, color);
-                                this->setPixelBlendDst(centerX + y, centerY + x, color);
-                                this->setPixelBlendDst(centerX - y, centerY + x, color);
-                                this->setPixelBlendDst(centerX - x, centerY + y, color);
-                                this->setPixelBlendDst(centerX - x, centerY - y, color);
-                                this->setPixelBlendDst(centerX - y, centerY - x, color);
-                                this->setPixelBlendDst(centerX + y, centerY - x, color);
-                                this->setPixelBlendDst(centerX + x, centerY - y, color);
 
-                                if(radiusError <= 0) {
-                                    y++;
-                                    radiusError += 2 * y + 1;
-                                } else {
-                                    x--;
-                                    radiusError -= 2 * x + 1;
+                                // bottom-right corner
+                                if (px >= x + w - radius && py >= y + h - radius) {
+                                    s32 dx = px - (x + w - radius - 1);
+                                    s32 dy = py - (y + h - radius - 1);
+                                    if (dx*dx + dy*dy > r2) draw = false;
                                 }
+
+                                if (draw)
+                                    this->setPixelBlendDst(px, py, color);
                             }
                         }
                     }
@@ -487,7 +439,6 @@ namespace alefbet {
                     inline void startFrame() {
                         if(!m_initialized) return;
                         this->m_currentFramebuffer = framebufferBegin(&this->m_framebuffer, nullptr);
-                        //this->fillScreen({ 0x00, 0x00, 0x00, 0x00 });
                     }
 
                     inline void fillScreen(Color color) {
@@ -523,15 +474,6 @@ namespace alefbet {
                      * @return Offset
                      */
                     u32 getPixelOffset(s32 x, s32 y) {
-                        /*if (!this->m_scissoringStack.empty()) {
-                            auto currScissorConfig = this->m_scissoringStack.top();
-                            if (x < currScissorConfig.x ||
-                                y < currScissorConfig.y ||
-                                x > currScissorConfig.x + currScissorConfig.w ||
-                                y > currScissorConfig.y + currScissorConfig.h)
-                                    return UINT32_MAX;
-                        }*/
-
                         u32 tmpPos = ((y & 127) / 16) + (x / 32 * 8) + ((y / 16 / 8) * (((FramebufferWidth / 2) / 16 * 8)));
                         tmpPos *= 16 * 16 * 4;
 
@@ -549,7 +491,6 @@ namespace alefbet {
                         logDebug("[Renderer] fb closed\n");
                         nwindowClose(&this->m_window);
                         logDebug("[Renderer] window closed\n");
-                        //viDestroyManagedLayer(&this->m_layer);
                         Result rc = viCloseLayer(&this->m_layer);
                         logDebug("[Renderer] layer closed %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = viCloseDisplay(&this->m_display);
@@ -575,10 +516,6 @@ namespace alefbet {
                         return this->m_currentFramebuffer;
                     }
 
-                    /*inline void* getNextFramebuffer() {
-                        return static_cast<u8*>(this->m_framebuffer.buf) + this->getNextFramebufferSlot() * this->getFramebufferSize();
-                    }*/
-
                     inline size_t getFramebufferSize() {
                         return this->m_framebuffer.fb_size;
                     }
@@ -594,122 +531,6 @@ namespace alefbet {
                     inline u8 getNextFramebufferSlot() {
                         return (this->getCurrentFramebufferSlot() + 1) % this->getFramebufferCount();
                     }
-
-                    /*Result _framebufferCreate(Framebuffer* fb, NWindow *win, u32 width, u32 height, u32 format, u32 num_fbs)
-                    {
-                        Result rc = 0;
-                        if (!fb || !nwindowIsValid(win) || !width || !height || format < PIXEL_FORMAT_RGBA_8888 || format > PIXEL_FORMAT_RGBA_4444 || num_fbs < 1 || num_fbs > 3)
-                            return MAKERESULT(Module_Libnx, LibnxError_BadInput);
-
-                        rc = nwindowSetDimensions(win, width, height);
-                        if (R_FAILED(rc))
-                            return rc;
-
-                        rc = nvInitialize();
-                        if (R_SUCCEEDED(rc)) {
-                            rc = nvMapInit();
-                            if (R_SUCCEEDED(rc)) {
-                                rc = nvFenceInit();
-                                if (R_FAILED(rc)) {
-                                    nvMapExit();
-                                }
-                            }
-                            if (R_FAILED(rc)) {
-                                nvExit();
-                            }
-                        }
-
-                        if (R_FAILED(rc))
-                            return rc;
-
-                        memset(fb, 0, sizeof(*fb));
-                        fb->has_init = true;
-                        fb->win = win;
-                        fb->num_fbs = num_fbs;
-
-                        const NvColorFormat colorfmt = g_nvColorFmtTable[format-PIXEL_FORMAT_RGBA_8888];
-                        const u32 bytes_per_pixel = ((u64)colorfmt >> 3) & 0x1F;
-                        const u32 block_height_log2 = 4; // According to TRM this is the optimal value (SIXTEEN_GOBS)
-                        const u32 block_height = 8 * (1U << block_height_log2);
-
-                        NvGraphicBuffer grbuf = {0};
-                        grbuf.header.num_ints = (sizeof(NvGraphicBuffer) - sizeof(NativeHandle)) / 4;
-                        grbuf.unk0 = -1;
-                        grbuf.magic = 0xDAFFCAFF;
-                        grbuf.pid = 42;
-                        grbuf.usage = GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_TEXTURE;
-                        grbuf.format = format;
-                        grbuf.ext_format = format;
-                        grbuf.num_planes = 1;
-                        grbuf.planes[0].width = width;
-                        grbuf.planes[0].height = height;
-                        grbuf.planes[0].color_format = colorfmt;
-                        grbuf.planes[0].layout = NvLayout_BlockLinear;
-                        grbuf.planes[0].kind = NvKind_Generic_16BX2;
-                        grbuf.planes[0].block_height_log2 = block_height_log2;
-
-                        // Calculate buffer dimensions and sizes
-                        const u32 width_aligned_bytes = (width*bytes_per_pixel + 63) &~ 63; // GOBs are 64 bytes wide
-                        const u32 width_aligned = width_aligned_bytes / bytes_per_pixel;
-                        const u32 height_aligned = (height + block_height - 1) &~ (block_height - 1);
-                        const u32 fb_size = width_aligned_bytes*height_aligned;
-                        const u32 buf_size = (num_fbs*fb_size + 0xFFF) &~ 0xFFF; // needs to be page aligned
-
-                        fb->buf = __libnx_aligned_alloc(0x1000, buf_size);
-                        if (!fb->buf)
-                            rc = MAKERESULT(Module_Libnx, LibnxError_OutOfMemory);
-
-                        if (R_SUCCEEDED(rc))
-                            rc = nvMapCreate(&fb->map, fb->buf, buf_size, 0x20000, NvKind_Pitch, true);
-
-                        if (R_SUCCEEDED(rc)) {
-                            grbuf.nvmap_id = nvMapGetId(&fb->map);
-                            grbuf.stride = width_aligned;
-                            grbuf.total_size = fb_size;
-                            grbuf.planes[0].pitch = width_aligned_bytes;
-                            grbuf.planes[0].size = fb_size;
-
-                            for (u32 i = 0; i < num_fbs; i ++) {
-                                grbuf.planes[0].offset = i*fb_size;
-                                rc = nwindowConfigureBuffer(win, i, &grbuf);
-                                if (R_FAILED(rc))
-                                    break;
-                            }
-                        }
-
-                        if (R_SUCCEEDED(rc)) {
-                            fb->stride = width_aligned_bytes;
-                            fb->width_aligned = width_aligned;
-                            fb->height_aligned = height_aligned;
-                            fb->fb_size = fb_size;
-                        }
-
-                        if (R_FAILED(rc)) {
-                            framebufferClose(fb);
-                        }
-
-                        return rc;
-                    }*/
-
-                    /*void framebufferClose(Framebuffer* fb)
-                    {
-                        if (!fb || !fb->has_init)
-                            return;
-
-                        if (fb->buf_linear)
-                            free(fb->buf_linear);
-
-                        if (fb->buf) {                            
-                            nwindowReleaseBuffers(fb->win);
-                            nvMapClose(&fb->map);
-                            free(fb->buf);
-                        }
-
-                        memset(fb, 0, sizeof(*fb));
-                        nvFenceExit();
-                        nvMapExit();
-                        nvExit();
-                    }*/
 
                 private:
                     u16 LayerWidth  = 0;

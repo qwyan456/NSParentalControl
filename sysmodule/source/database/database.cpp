@@ -29,60 +29,17 @@ namespace alefbet::pctrl::database {
     static FsFileSystem sdmc_;
     static FsFile handle_settings_;
     static FsFile handle_database_;
-    static FsFile handle_passwords_;
     static std::mutex mutex_settings_;    
     static std::mutex mutex_database_;
-    static std::mutex mutex_passwords_;
     static bool ready_ = false;
     static bool data_synchronized_ = false; // The data are synchronized between the cache and the file
     static bool settings_synchronized_ = false; 
-    static bool passwords_synchronized_ = false; 
     static History history_;
     static Settings settings_;
     static bool mustUpgrade_ = false;
     static bool isTampered_ = false;
 
     namespace crypto {
-        /*static struct AES_ctx aes_ctx;
-
-        void initCrypto() {
-            Result rc = splInitialize();
-            if(R_FAILED(rc)) {
-                logError("[Database] Could not connect to spl service\n");
-                return;
-            }
-
-            // Get the device ID            
-            u64 deviceId = 0;
-            splGetConfig(SplConfigItem_DeviceId, &deviceId);
-            if(R_FAILED(rc)) {
-                logError("[Database] Failed to get Device ID for ciphering\n");
-                return;
-            }
-
-            // Derivate a hash
-            u8 hash[32] = {0};
-            sha256CalculateHash(hash, (u8*)&deviceId, sizeof(deviceId));
-
-            // Create a 128 bit key
-            u8 cipher_key[16];
-            memcpy(cipher_key, hash, 16);
-
-            // Initialize AES context
-            AES_init_ctx(&aes_ctx, cipher_key);            
-            
-            splExit();
-            cipher_ready = true;
-        }
-
-        void encryptBuffer(u8* buffer, u64 size) {
-            AES_CBC_encrypt_buffer(&aes_ctx, buffer, size);
-        }
-
-        void decryptBuffer(u8* buffer, u64 size) {
-            AES_CBC_decrypt_buffer(&aes_ctx, buffer, size);
-        }*/
-
         static const char b64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
         std::string base64Encode(const std::vector<uint8_t>& data)
@@ -362,9 +319,9 @@ namespace alefbet::pctrl::database {
         if(R_FAILED(fsFsCreateFile(&sdmc_, DB_FILENAME, 0, 0))) {
             logError("[Database] Could not create the database file\n");
             return;
-        } else {
+        } /*else {
             logDebug("[Database] New database file created\n");
-        }
+        }*/
 
         if(R_FAILED(fsFsOpenFile(&sdmc_, DB_FILENAME, FsOpenMode_Write | FsOpenMode_Append, &handle_database_))) {
             logError("[Database] The database file could not be opened for writing\n");
@@ -372,11 +329,12 @@ namespace alefbet::pctrl::database {
         }
 
         const auto stdstr_data = j_history.dump();
-        const auto str_data = stdstr_data.c_str();
-        u64 lenstr = std::strlen(str_data);
+        //const auto str_data = stdstr_data.c_str();
+        u64 lenstr = stdstr_data.length();
         void* s_data = malloc(lenstr+1);
         memset(s_data, 0, lenstr);
-        memcpy(s_data, str_data, lenstr);
+        //memcpy(s_data, str_data, lenstr);
+        std::snprintf((char*)s_data, lenstr, "%s", stdstr_data.c_str());
 
         logDebug("[Database] Writing sessions data %s (size=%i)\n", s_data, lenstr);    
 
@@ -385,6 +343,7 @@ namespace alefbet::pctrl::database {
         }
 
         fsFileClose(&handle_database_);
+        free(s_data);
     }    
 
     std::vector<HistoryEntry> getHistory(AccountUid uid, std::string date) {
@@ -394,6 +353,11 @@ namespace alefbet::pctrl::database {
         return history_.entries(uid, date);
     }
 
+    /*! \brief Adds an entry in the history
+     *
+     * An history entry represents the duration of play for a single title for a single player.
+     * An entry is composed of an account ID, a title ID and the duration of play.
+    */
     HistoryEntry addToHistory(AccountUid uid, u64 titleId, u16 duration_in_minutes) 
     {
         HistoryEntry result;
@@ -457,17 +421,6 @@ namespace alefbet::pctrl::database {
                 }
             }
 
-            /*saveSetting(Setting {
-                .key = SETTING_DAILY_LIMIT_GAME,
-                .type = INTEGER,
-                .int_value = 1*60 //Default: 1 hour
-            });
-                        
-            saveSetting(Setting {
-                .key = SETTING_DAILY_LIMIT_GLOBAL,
-                .type = INTEGER,
-                .int_value = 1*60 //Default: 1 hour
-            });*/
             saveSetting(Setting {
                 .key = SETTING_ENABLED,
                 .type = INTEGER,

@@ -8,3 +8,7 @@ $ mtp-detect
 $ mtp-connect
 
 ```
+
+## Workaround for ptpcamerad conflict
+
+`while ; do; pgrep -lf "[p]tpcamera" && pkill -9 -f "[p]tpcamera" ; done`

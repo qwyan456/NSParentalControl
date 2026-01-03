@@ -3,12 +3,11 @@
 #include <switch.h>
 #include "Command.hpp"
 #include "AppContext.h"
-#include "version.h"
 #include "logger.h"
 #include "helpers/ipc_helpers.h"
 #include "panel_setuppin.h"
 #include "panel_main_menu.h"
-#include "panel_setup_limits.h"
+#include "panel_setup_limits_main.h"
 
 using namespace alefbet::pctrl;
 using namespace alefbet::pctrl::logger;
@@ -35,7 +34,7 @@ tsl::elm::Element* AdminMenuPanel::createUI() {
 void AdminMenuPanel::rebuildUI() {
 
     // Enable parental control
-    auto entryEnabled = new tsl::elm::ToggleListItem("Enabled", getAppContext().is_enabled, "Enabled", "Disabled");
+    auto entryEnabled = new tsl::elm::ToggleListItem("State", getAppContext().is_enabled, "Enabled", "Disabled");
     rootList_->addItem(entryEnabled);        
     entryEnabled->setStateChangedListener([entryEnabled] (bool enabled) -> bool {
         bool res = ipc::setEnabled(enabled);
@@ -46,23 +45,7 @@ void AdminMenuPanel::rebuildUI() {
         return true;
     });    
 
-    // Set working mode
-    /*const auto& workingMode = ipc::getWorkingMode();
-
-    auto entrySetWorkingMode = new tsl::elm::ToggleListItem("Working mode", workingMode, "Blocking", "Information");
-    rootList_->addItem(entrySetWorkingMode);
-    entrySetWorkingMode->setClickListener([entrySetWorkingMode](u64 keys) -> bool {
-        if(keys & HidNpadButton_A) {            
-            bool res = ipc::setWorkingMode(entrySetWorkingMode->getState() ? ipc::WorkingModeBlocking : ipc::WorkingModeInfo);
-            if(!res) {
-                entrySetWorkingMode->setState(!entrySetWorkingMode->getState());
-            }
-            return true;
-        }
-
-        return false;
-    });*/
-    auto entrySetWorkingMode = new tsl::elm::ListItem("WorkingMode", "Blocking");
+    auto entrySetWorkingMode = new tsl::elm::ListItem("Working mode", "Blocking");
     rootList_->addItem(entrySetWorkingMode);
 
     // Show notifications
@@ -119,7 +102,7 @@ void AdminMenuPanel::rebuildUI() {
     });
 
     rootList_->addItem(new tsl::elm::CategoryHeader("Versions"));
-    rootList_->addItem(new tsl::elm::ListItem("Overlay", "v" +std::string(VERSION)));
+    rootList_->addItem(new tsl::elm::ListItem("Overlay", std::string(VERSION)));
     rootList_->addItem(new tsl::elm::ListItem("Sysmodule", ipc::getVersion()));        
 
     rootFrame_->setContent(rootList_);

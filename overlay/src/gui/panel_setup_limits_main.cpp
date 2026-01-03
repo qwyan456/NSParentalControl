@@ -1,4 +1,4 @@
-#include "panel_history_main.h"
+#include "panel_setup_limits_main.h"
 #include <switch.h>
 #include <chrono>
 #include "logger.h"
@@ -6,19 +6,19 @@
 #include "AppContext.h"
 #include "helpers/ipc_helpers.h"
 #include "helpers/switch_helpers.h"
-#include "panel_history_user.h"
+#include "panel_setup_limits_user.h"
 
 using namespace alefbet::pctrl;
 using namespace alefbet::pctrl::helpers;
 
-HistoryMainPanel::HistoryMainPanel() {    
+SetupLimitsPanel::SetupLimitsPanel() {    
 }
 
-HistoryMainPanel::~HistoryMainPanel() {      
+SetupLimitsPanel::~SetupLimitsPanel() {      
 }
 
-tsl::elm::Element* HistoryMainPanel::createUI() {
-    rootFrame_ = new tsl::elm::OverlayFrame("Parental Control", "Usage history");
+tsl::elm::Element* SetupLimitsPanel::createUI() {
+    rootFrame_ = new tsl::elm::OverlayFrame("Parental Control", "Set limits");
     rootList_ = new tsl::elm::List();
     
     rebuildUI();        
@@ -27,7 +27,7 @@ tsl::elm::Element* HistoryMainPanel::createUI() {
 }
 
 
-void HistoryMainPanel::rebuildUI() {
+void SetupLimitsPanel::rebuildUI() {
     rootList_->addItem(new tsl::elm::CategoryHeader("Choose a user"));
 
     const auto& users = helpers::getUsersList();    
@@ -37,7 +37,7 @@ void HistoryMainPanel::rebuildUI() {
         rootList_->addItem(entryUser);        
         entryUser->setClickListener([user](u64 keys) {
             if(keys & HidNpadButton_A) {
-                tsl::changeTo<HistoryUserPanel>(user);
+                tsl::changeTo<SetupLimitsUserPanel>(user);
                 return true;
             }
 
@@ -48,11 +48,11 @@ void HistoryMainPanel::rebuildUI() {
     rootFrame_->setContent(rootList_);
 }
 
-void HistoryMainPanel::update() {    
+void SetupLimitsPanel::update() {    
 }
 
 // Called once every frame to handle inputs not handled by other UI elements
-bool HistoryMainPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouchState &touchPos, HidAnalogStickState joyStickPosLeft, HidAnalogStickState joyStickPosRight) {
+bool SetupLimitsPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouchState &touchPos, HidAnalogStickState joyStickPosLeft, HidAnalogStickState joyStickPosRight) {
     if (keysDown & HidNpadButton_B) {
         tsl::goBack();
         return true;

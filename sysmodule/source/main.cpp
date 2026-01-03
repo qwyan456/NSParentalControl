@@ -8,7 +8,7 @@
 #include "database/database.h"
 #include "utils.h"
 #include "ipc/Server.hpp"
-#include "service.hpp"
+#include "service.h"
 #include "monitor.h"
 
 using namespace alefbet::pctrl::logger;
@@ -35,6 +35,20 @@ extern "C" {
 
     u32 __nx_applet_type = AppletType_None;
     ViLayerFlags __nx_vi_stray_layer_flags = (ViLayerFlags)0;
+
+    alignas(ams::os::MemoryPageSize) constinit u8 g_nv_transfer_memory[0x40000];
+    ::Result __nx_nv_create_tmem(TransferMemory *t, u32 *out_size, Permission perm) {
+        *out_size = sizeof(g_nv_transfer_memory);
+        
+        ::Result rc = tmemCreateFromMemory(t, g_nv_transfer_memory, sizeof(g_nv_transfer_memory), perm);
+        if(R_FAILED(rc)) {
+            logError("[Main] Could not create TransferMemory\n");            
+        } else {
+            logDebug("[Main] Successfully created TransferMemory\n");
+        }
+
+        return rc;
+    }
 
     void __libnx_initheap(void)
     {

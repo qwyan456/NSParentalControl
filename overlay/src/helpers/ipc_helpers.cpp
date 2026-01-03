@@ -190,28 +190,6 @@ namespace alefbet::pctrl::ipc {
         return pin;
     }
 
-    /*std::vector<u64> decodeAdminPin(const std::string& pin) {
-        std::vector<u64> keys;
-
-        for (const auto part : std::views::split(pin, ",")) {
-            std::string val = std::string(part.begin(), part.end());
-            keys.push_back(std::stoull(val));
-        }
-
-        if(keys.size() != 4) {
-            logToFile("[IPC] The decoded PIN is not 4 digits long.");
-            return keys;
-        }
-
-        logToFile("[IPC] Decoded Admin PIN:");
-        logIntToFile(keys[0]);
-        logIntToFile(keys[1]);
-        logIntToFile(keys[2]);
-        logIntToFile(keys[3]);
-
-        return keys;
-    }*/
-
     bool verifyPin(const std::vector<u64>& pin) {
         logDebug("[IPC] Verify Admin PIN\n");
 
@@ -225,7 +203,7 @@ namespace alefbet::pctrl::ipc {
         u64 a_pin[4] = { 
             pin[0], pin[1], pin[2], pin[3]
         };        
-        //std::strncpy(pin_str, pin.c_str(), pin.size());
+
         logDebug("PIN = %s\n", encodeAdminPin(pin).c_str());
         Result res = serviceDispatchInOut(&service, (u32)Ipc::Command::VerifyAdminPin, a_pin, verified);
 
@@ -246,8 +224,7 @@ namespace alefbet::pctrl::ipc {
         }
 
         auto& service = getAppContext().pctrl_service;
-        //char pin_str[PIN_LEN_MAX+1] = {0};
-        //std::strncpy(pin_str, pin.c_str(), pin.size());
+        
         u64 a_pin[4] = { 
             pin[0], pin[1], pin[2], pin[3]
         }; 
@@ -412,7 +389,7 @@ namespace alefbet::pctrl::ipc {
         return std::string(version);
     }
 
-    u16 getDailyLimit() {
+    u16 getDailyLimit(const UserData& user) {
         logDebug("[IPC] Getting daily limit\n");
 
         if(!isAvailable()) {
@@ -420,10 +397,14 @@ namespace alefbet::pctrl::ipc {
             return 0;
         }
 
-        u16 limit = 0;
+        u16 limit = 0;        
+        char chUserId[80] = {0};
+
+        const auto& userId = helpers::accountUidToString(user.uid);
+        std::snprintf(chUserId, sizeof(chUserId), "%s", userId.c_str());
 
         auto& service = getAppContext().pctrl_service;
-        Result res = serviceDispatchOut(&service, (u32)Ipc::Command::GetDailyLimit, limit);
+        Result res = serviceDispatchInOut(&service, (u32)Ipc::Command::GetUserDailyLimit, chUserId, limit);
 
         if(R_FAILED(res)) {
             logError("[IPC] An error occured while getting the daily limit.\n");
@@ -434,16 +415,28 @@ namespace alefbet::pctrl::ipc {
         return limit;
     }
 
-    bool setDailyLimit(const u16& limit) {
-        logDebug("[IPC] Setting the daily limit\n");
+    bool setDailyLimit(const UserData& user, u16 limit) {
+        logDebug("[IPC] Setting the daily limit to %i\n", limit);
 
         if(!isAvailable()) {
             logError("[IPC] service not available\n");
             return false;
         }
 
+        typedef struct {
+            u16 limit_in_minutes;
+            char userId[80];
+        } Args;
+
+        Args args {
+            .limit_in_minutes = limit,            
+        };
+
+        const auto& userId = helpers::accountUidToString(user.uid);
+        std::snprintf(args.userId, sizeof(args.userId), "%s", userId.c_str());
+
         auto& service = getAppContext().pctrl_service;
-        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetDailyLimit, limit);
+        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetUserDailyLimit, args);
 
         if(R_FAILED(res)) {
             logError("[IPC] An error occured while setting the daily limit.\n");
@@ -537,5 +530,6 @@ namespace alefbet::pctrl::ipc {
         logDebug("[IPC] Needs upgrade is %i\n", mustUpgrade ? "true" : "false");
 
         return mustUpgrade != 0;
-    }    
+    }        
+
 }

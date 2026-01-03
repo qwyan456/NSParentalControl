@@ -19,7 +19,7 @@
 #include <map>
 #include <list>
 #include <sstream>
-#include "service.hpp"
+#include "service.h"
 #include "logger.h"
 #include "ipc/Command.hpp"
 #include "ipc/Result.hpp"
@@ -29,7 +29,6 @@
 #include "monitor.h"
 #include "gui/gui_controller.h"
 #include "notifications_controller.h"
-//#define PSEC_DEBUG 1
 
 using namespace alefbet::pctrl::logger;
 using namespace alefbet::pctrl::database;
@@ -146,11 +145,6 @@ namespace alefbet::pctrl::srv {
         return Ipc::Result::Ok;
     }
 
-    Ipc::Result Service::getUsersList(Ipc::Request* request) {
-        logError("[Service] WARNING! GetUsersList command is deprecated\n");
-        return Ipc::Result::Ok;
-    }
-
     Ipc::Result Service::getUserRemainingTime(Ipc::Request* request) {
         char user_uid[40] = {0};
         structs::UserData user;
@@ -179,7 +173,7 @@ namespace alefbet::pctrl::srv {
         }
 
         const auto history = getHistory(user.uid, date);
-        auto usage_time_in_minutes = (u16)0;        
+        u16 usage_time_in_minutes = 0;
 
         // Compute the total usage for today 
         for(const auto& entry: history) {
@@ -188,7 +182,8 @@ namespace alefbet::pctrl::srv {
 
         // Get the daily limit
         auto settings = loadSettings();
-        const auto daily_limit = settings[SETTING_DAILY_LIMIT_GLOBAL].int_value;
+        const auto& userId = accountUidToString(user.uid);
+        const auto& daily_limit = getDailyLimitForUser(userId);
         s16 remaining_time_in_minutes = 0;
         if(daily_limit > usage_time_in_minutes) {
             remaining_time_in_minutes = daily_limit - usage_time_in_minutes;
@@ -223,13 +218,7 @@ namespace alefbet::pctrl::srv {
 
         logDebug("[Service] Get usage time for user %s\n", user.nickname.c_str());
 
-        const auto history = getHistory(user.uid, today());
-        auto usage_time_in_minutes = (u16)0;        
-
-        // Compute the total usage for today 
-        for(const auto& entry: history) {
-            usage_time_in_minutes += entry.durationInMinutes();
-        }
+        const auto& usage_time_in_minutes = getUserUsageTimeForToday(user.uid);
 
         logDebug("[Service] User=%s, usage=%i minutes\n", user.nickname.c_str(), usage_time_in_minutes);
 
@@ -238,25 +227,40 @@ namespace alefbet::pctrl::srv {
         return Ipc::Result::Ok;
     }
 
-    Ipc::Result Service::setUserLimits(Ipc::Request* request) {
-        // Now the limit is global not per user so we don't use the first argument
-        u16 limit_in_minutes;
-        Ipc::Result rc = request->readRequestData(limit_in_minutes);
+    Ipc::Result Service::setUserDailyLimit(Ipc::Request* request) {        
+        typedef struct {
+            u16 limit_in_minutes;
+            char userId[80];
+        } Args;
+
+        Args args{0};
+
+        Ipc::Result rc = request->readRequestValue(args);
         if(rc != Ipc::Result::Ok) {
             logError("[Service] Could not read request data (limit)\n");
             return rc;
         }
 
-        auto settings = loadSettings();
+        std::string userId = std::string(args.userId);
+        helpers::setDailyLimitForUser(userId, args.limit_in_minutes);
+        
+        return Ipc::Result::Ok;
+    }
 
-        Setting setting {        
-            .key = SETTING_DAILY_LIMIT_GLOBAL,
-            .type = INTEGER,
-            .int_value = limit_in_minutes
-        };
+    Ipc::Result Service::getUserDailyLimit(Ipc::Request* request) {                
+        char _userId[80] = {0};
 
-        saveSetting(setting);
+        Ipc::Result rc = request->readRequestValue(_userId);
+        if(rc != Ipc::Result::Ok) {
+            logError("[Service] Could not read request data\n");
+            return rc;
+        }
 
+        std::string userId = std::string(_userId);
+        const auto& limit = helpers::getDailyLimitForUser(userId);
+
+        request->appendReplyValue(limit);
+        
         return Ipc::Result::Ok;
     }
 
@@ -443,45 +447,7 @@ namespace alefbet::pctrl::srv {
         }
 
         return Ipc::Result::Ok;
-    }
-
-    Ipc::Result Service::getDailyLimit(Ipc::Request* request) {
-        logDebug("[Service] Getting the daily limit\n");
-
-        auto settings = loadSettings();        
-        u16 limit_in_minutes = 0;
-        
-        if(settings.contains(SETTING_DAILY_LIMIT_GLOBAL)) {
-            limit_in_minutes = settings[SETTING_DAILY_LIMIT_GLOBAL].int_value;
-        }
-
-        request->appendReplyValue(limit_in_minutes);
-
-        return Ipc::Result::Ok;
-    }
-
-    Ipc::Result Service::setDailyLimit(Ipc::Request* request) {
-        logDebug("[Service] Setting the daily limit\n");
-
-        u16 limit = 0;
-        Ipc::Result rc = request->readRequestValue(limit);
-        if(rc != Ipc::Result::Ok) {
-            logError("[Service] Could not read the daily limit\n");
-            return Ipc::Result::BadInput;
-        }        
-
-        auto settings = loadSettings();
-        auto setting = Setting{
-            .key = SETTING_DAILY_LIMIT_GLOBAL,
-            .type = INTEGER,
-            .int_value = limit
-        };
-
-        saveSetting(setting);
-        logDebug("[Service] Daily limit is set to %i minutes\n", limit);
-
-        return Ipc::Result::Ok;
-    }
+    }    
 
     Ipc::Result Service::getCurrentVersion(Ipc::Request* request) {
         logDebug("[Service] Getting current version: %s\n", VERSION);
@@ -571,10 +537,7 @@ namespace alefbet::pctrl::srv {
             }
             case Ipc::Command::GetCurrentUserNickname: {
                 return getCurrentUserNickname(request);
-            }
-            case Ipc::Command::GetUsersList: {
-                return getUsersList(request);
-            }        
+            }                   
             case Ipc::Command::GetUserUsageTime: {                                
                 return getUserUsageTime(request);                
             }
@@ -584,8 +547,11 @@ namespace alefbet::pctrl::srv {
             case Ipc::Command::GetRunningApplication: {
                 return getRunningApplication(request);
             }
-            case Ipc::Command::SetUserLimits: {                           
-                return setUserLimits(request);
+            case Ipc::Command::SetUserDailyLimit: {
+                return setUserDailyLimit(request);
+            }            
+            case Ipc::Command::GetUserDailyLimit: {
+                return getUserDailyLimit(request);
             }
             case Ipc::Command::SetAdminPin: {                
                 return setAdminPin(request);
@@ -610,12 +576,6 @@ namespace alefbet::pctrl::srv {
             }
             case Ipc::Command::SetEnabled: {
                 return setEnabled(request);
-            }
-            case Ipc::Command::GetDailyLimit: {
-                return getDailyLimit(request);
-            }
-            case Ipc::Command::SetDailyLimit: {
-                return setDailyLimit(request);
             }
             case Ipc::Command::SetLogLevel: {
                 return setLogLevel(request);
