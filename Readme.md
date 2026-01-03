@@ -57,6 +57,7 @@ Parental control has the following features:
 - Enable or disable the parental control (since 1.0)
 - Enable or disable the notifications (since 1.2)
 - Choose the log level between Debug and Information (since 1.2)
+- Define individual limits (since 1.3)
 
 ## Coming features
 
