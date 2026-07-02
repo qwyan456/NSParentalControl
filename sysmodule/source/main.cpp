@@ -83,22 +83,13 @@ extern "C" {
         if (R_FAILED(rc))
             fatalThrow(MAKERESULT(Module_HomebrewLoader, 2));
 
-        
-        if (hosversionAtLeast(16,0,0)) {
-            plInitialize(PlServiceType_User);
-        } else {
-            plInitialize(PlServiceType_System);
-        }
-
-        i2cInitialize();
-        bpcInitialize();
-        hidInitialize();
-        hidsysInitialize();
-        pmdmntInitialize();
-        nsInitialize();
-        // FIX: 删除 smExit() — 不能在 __appInit 中关闭 sm 会话
-        // Ipc::Server 构造函数需要 sm session 来注册 "pctrl" 服务
-        // 在 __appInit 末尾调用 smExit() 会导致后续 smRegisterService 失败
+        // FIX: 移除所有非必需的服务初始化
+        // i2cInitialize() — 完全未使用
+        // bpcInitialize() — 仅 rebootToPayload() 需要，改为按需初始化
+        // hidInitialize() / hidsysInitialize() — sysmodule 未使用
+        // plInitialize() — 仅字体渲染需要，移到 screen_timeout/renderer 按需初始化
+        // pmdmntInitialize() / nsInitialize() — 移到 main() 中初始化
+        // 这些服务在 boot2 阶段打开会占用系统资源，导致 HOME Menu 初始化冲突
     }
 
     void __wrap_exit(void)
@@ -166,6 +157,11 @@ int main(int argc, char **argv)
     logInfo("[Main] Parental control starting\n");
 
     //testMemory();
+
+    // FIX: 在 main() 中初始化 pmdmnt 和 ns（从 __appInit 移出）
+    // 这些服务在 __appInit 中初始化会导致 boot2 阶段与 HOME Menu 冲突
+    pmdmntInitialize();
+    nsInitialize();
 
     ::Result rc = 0;
 

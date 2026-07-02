@@ -389,6 +389,13 @@ namespace alefbet {
                     Result initFonts() {
                         static PlFontData stdFontData, localFontData, extFontData;
 
+                        // FIX: plInitialize() 从 __appInit 移到这里，按需初始化
+                        if (hosversionAtLeast(16,0,0)) {
+                            plInitialize(PlServiceType_User);
+                        } else {
+                            plInitialize(PlServiceType_System);
+                        }
+
                         // Nintendo's default font
                         plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard);
 

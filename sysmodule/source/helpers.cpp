@@ -301,7 +301,8 @@ namespace alefbet::pctrl::helpers {
         logInfo("[Helpers] Try to reboot to payload\n");
       
         u8 *g_reboot_payload = new u8[IRAM_PAYLOAD_MAX_SIZE];
-        // FIX: smInitialize() 已在 __appInit 中调用，无需重复
+        // FIX: bpcInitialize() 从 __appInit 移到这里，按需初始化
+        bpcInitialize();
         if(!readPayloadFile(g_reboot_payload, IRAM_PAYLOAD_MAX_SIZE)) {
             logError("[Helpers] No payload, shutting down.");
             bpcShutdownSystem();

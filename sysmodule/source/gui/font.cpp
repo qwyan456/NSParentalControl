@@ -241,6 +241,13 @@ namespace alefbet::pctrl::font {
     }
 
     Result InitializeSharedFont() {
+        // FIX: plInitialize() 从 __appInit 移到这里，按需初始化
+        if (hosversionAtLeast(16,0,0)) {
+            plInitialize(PlServiceType_User);
+        } else {
+            plInitialize(PlServiceType_System);
+        }
+
         ::Result rc = plGetSharedFontByType(std::addressof(g_font), PlSharedFontType_Standard);
         if(rc != 0) {
             logError("[Font] font initialization failed\n");
