@@ -83,13 +83,9 @@ extern "C" {
         if (R_FAILED(rc))
             fatalThrow(MAKERESULT(Module_HomebrewLoader, 2));
 
-        // FIX: 移除所有非必需的服务初始化
-        // i2cInitialize() — 完全未使用
-        // bpcInitialize() — 仅 rebootToPayload() 需要，改为按需初始化
-        // hidInitialize() / hidsysInitialize() — sysmodule 未使用
-        // plInitialize() — 仅字体渲染需要，移到 screen_timeout/renderer 按需初始化
-        // pmdmntInitialize() / nsInitialize() — 移到 main() 中初始化
-        // 这些服务在 boot2 阶段打开会占用系统资源，导致 HOME Menu 初始化冲突
+        // FIX: 挂载 SD 卡文件系统，这是 sysmodule 读取配置/日志/数据库的前提
+        // 所有文件操作（logger/database/helpers）都依赖 SD 卡
+        fsdevMountSdmc();
     }
 
     void __wrap_exit(void)
@@ -156,15 +152,40 @@ int main(int argc, char **argv)
 
     logInfo("[Main] Parental control starting\n");
 
-    //testMemory();
+    // FIX: 采用 sys-clk 标准模式 — 等待 HOME Menu (qlaunch) 完全启动后
+    // 再注册 IPC 服务和启动 Monitor
+    // boot2 阶段 qlaunch 尚未启动，此时注册服务/调用 pmdmnt 会导致冲突
+    logInfo("[Main] Waiting for qlaunch to be ready\n");
+    
+    // 初始化 pmdmnt 以便轮询 qlaunch 状态
+    pmdmntInitialize();
+    
+    // 等待 HOME Menu (qlaunch, title_id=0x0100000000000023) 启动
+    // 最多等待 30 秒
+    {
+        u64 qlaunch_pid = 0;
+        for(int i = 0; i < 60; i++) {
+            // pmdmntGetProcessId 可以获取 qlaunch 的 PID
+            if(R_SUCCEEDED(pmdmntGetProcessId(&qlaunch_pid, 0x0100000000000023ULL)) && qlaunch_pid != 0) {
+                logInfo("[Main] qlaunch is ready (pid=%llu)\n", qlaunch_pid);
+                break;
+            }
+            svcSleepThread(500'000'000); // 500ms
+        }
+        if(qlaunch_pid == 0) {
+            logError("[Main] qlaunch not detected after 30s, starting anyway\n");
+        }
+    }
 
-    // FIX: pmdmnt/ns 延迟到系统就绪后再初始化
-    // 在 boot2 阶段初始化这些服务并立即启动 Monitor 会与 HOME Menu 的
-    // account 服务初始化产生冲突，导致 HOME Menu (0100000000000023) 崩溃
+    // 再额外等待 2 秒让 HOME Menu 完全初始化
+    svcSleepThread(2'000'000'000LL);
+
+    // 初始化 ns 服务
+    nsInitialize();
 
     ::Result rc = 0;
 
-    // 立即启动 IPC Server，让 overlay 能连接到 pctrl 服务
+    // 现在注册 IPC 服务，overlay 可以连接
     Ipc::Server* ipcServer = new Ipc::Server("pctrl");
     alefbet::pctrl::srv::Service* service = new alefbet::pctrl::srv::Service(ipcServer);    
 
@@ -179,16 +200,6 @@ int main(int argc, char **argv)
         logError("Could not start the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
         return 3;
     }
-
-    // FIX: 等待系统完全启动后再初始化 pmdmnt/ns 并启动 Monitor
-    // HOME Menu (qlaunch) 需要几秒钟才能完全启动
-    // 过早调用 pmdmnt/account 等服务会干扰 HOME Menu 的初始化
-    logInfo("[Main] Waiting for system to be ready before starting monitor\n");
-    svcSleepThread(10'000'000'000LL); // 10 seconds
-
-    // 系统就绪后初始化 pmdmnt 和 ns
-    pmdmntInitialize();
-    nsInitialize();
         
     Thread threadMonitor;
     alefbet::pctrl::srv::Monitor* monitor = new alefbet::pctrl::srv::Monitor();
