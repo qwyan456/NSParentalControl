@@ -78,7 +78,8 @@ namespace alefbet::pctrl::helpers {
     UserData getUserFromAccountUid(AccountUid uid) {
         UserData user;
 
-        ::Result rc = accountInitialize(AccountServiceType_Administrator);
+        // FIX: 使用 System 模式而非 Administrator 模式
+        ::Result rc = accountInitialize(AccountServiceType_System);
         if(R_FAILED(rc)) {
             logError("[Helpers] Could not initialize account service: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             user.nickname = UserNickname("ERR#003");
@@ -123,7 +124,10 @@ namespace alefbet::pctrl::helpers {
     UserData getCurrentUser() {
         UserData user;
 
-        ::Result rc = accountInitialize(AccountServiceType_Administrator);
+        // FIX: 使用 System 模式而非 Administrator 模式
+        // Administrator 模式 (acc:u0) 会独占 account 服务，与 HOME Menu 冲突
+        // System 模式 (acc:su0) 更安全，不会干扰 HOME Menu
+        ::Result rc = accountInitialize(AccountServiceType_System);
         if(R_FAILED(rc)) {
             logError("[Helpers] Could not initialize account service: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
             user.nickname = UserNickname("ERR#003");

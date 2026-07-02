@@ -158,14 +158,13 @@ int main(int argc, char **argv)
 
     //testMemory();
 
-    // FIX: 在 main() 中初始化 pmdmnt 和 ns（从 __appInit 移出）
-    // 这些服务在 __appInit 中初始化会导致 boot2 阶段与 HOME Menu 冲突
-    pmdmntInitialize();
-    nsInitialize();
+    // FIX: pmdmnt/ns 延迟到系统就绪后再初始化
+    // 在 boot2 阶段初始化这些服务并立即启动 Monitor 会与 HOME Menu 的
+    // account 服务初始化产生冲突，导致 HOME Menu (0100000000000023) 崩溃
 
     ::Result rc = 0;
 
-    // Loop processing the IPC server.        
+    // 立即启动 IPC Server，让 overlay 能连接到 pctrl 服务
     Ipc::Server* ipcServer = new Ipc::Server("pctrl");
     alefbet::pctrl::srv::Service* service = new alefbet::pctrl::srv::Service(ipcServer);    
 
@@ -180,6 +179,16 @@ int main(int argc, char **argv)
         logError("Could not start the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
         return 3;
     }
+
+    // FIX: 等待系统完全启动后再初始化 pmdmnt/ns 并启动 Monitor
+    // HOME Menu (qlaunch) 需要几秒钟才能完全启动
+    // 过早调用 pmdmnt/account 等服务会干扰 HOME Menu 的初始化
+    logInfo("[Main] Waiting for system to be ready before starting monitor\n");
+    svcSleepThread(10'000'000'000LL); // 10 seconds
+
+    // 系统就绪后初始化 pmdmnt 和 ns
+    pmdmntInitialize();
+    nsInitialize();
         
     Thread threadMonitor;
     alefbet::pctrl::srv::Monitor* monitor = new alefbet::pctrl::srv::Monitor();

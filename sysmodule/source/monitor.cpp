@@ -62,41 +62,51 @@ namespace alefbet::pctrl::srv {
             
             if(pid != 0) { 
                 const auto title_id = getRunningApplicationTitleId(pid);
-                user = getCurrentUser();
 
-                if(user.isValid()) {
-                    logDebug("[Monitor] Title %i is currently in used by %s. Updating history.\n", title_id, user.nickname.c_str());                    
+                // FIX: 不监控 HOME Menu (qlaunch) 和其他系统应用
+                // HOME Menu 的 title_id 是 0x0100000000000023
+                // 系统应用 title_id 以 0x01000000000010xx 开头
+                if(title_id == 0x0100000000000023ULL || 
+                   (title_id >= 0x0100000000001000ULL && title_id <= 0x010000000000101FULL)) {
+                    logDebug("[Monitor] System app (0x%016llx) running, skipping\n", title_id);
+                    currentTitle_ = 0;
+                } else {
+                    user = getCurrentUser();
 
-                    const auto& entry = addToHistory(user.uid, title_id, MainLoopDelayInMinutes.count());
+                    if(user.isValid()) {
+                        logDebug("[Monitor] Title %i is currently in used by %s. Updating history.\n", title_id, user.nickname.c_str());                    
 
-                    if(!entry.isValid()) {
-                        logError("[Monitor] The database entry is corrupted\n");
-                        continue;
-                    }
+                        const auto& entry = addToHistory(user.uid, title_id, MainLoopDelayInMinutes.count());
 
-                    const auto totalDuration = getUserUsageTimeForToday(user.uid);                    
+                        if(!entry.isValid()) {
+                            logError("[Monitor] The database entry is corrupted\n");
+                            continue;
+                        }
 
-                    const auto& userId = accountUidToString(user.uid);
-                    daily_limit = getDailyLimitForUser(userId);
+                        const auto totalDuration = getUserUsageTimeForToday(user.uid);                    
 
-                    u16 remainingTimeInMinutes = daily_limit > totalDuration ? daily_limit - totalDuration : 0;
-                    logDebug("[Monitor] Remaining time for user %s is %i minutes. Daily limit=%i\n", user.nickname.c_str(), remainingTimeInMinutes, daily_limit);
+                        const auto& userId = accountUidToString(user.uid);
+                        daily_limit = getDailyLimitForUser(userId);
 
-                    if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
-                        const auto& showRemainingTime = settings[SETTING_SHOW_REMAINING_TIME].int_value > 0;                                                
-                        if(showRemainingTime) {                            
-                            if(shouldSendNotification(remainingTimeInMinutes)) {
-                                NotificationsController::notifyRemainingTime(remainingTimeInMinutes);
+                        u16 remainingTimeInMinutes = daily_limit > totalDuration ? daily_limit - totalDuration : 0;
+                        logDebug("[Monitor] Remaining time for user %s is %i minutes. Daily limit=%i\n", user.nickname.c_str(), remainingTimeInMinutes, daily_limit);
+
+                        if(settings.contains(SETTING_SHOW_REMAINING_TIME)) {
+                            const auto& showRemainingTime = settings[SETTING_SHOW_REMAINING_TIME].int_value > 0;                                                
+                            if(showRemainingTime) {                            
+                                if(shouldSendNotification(remainingTimeInMinutes)) {
+                                    NotificationsController::notifyRemainingTime(remainingTimeInMinutes);
+                                }
                             }
                         }
-                    }
 
-                    if(remainingTimeInMinutes <= 0) {
-                        logInfo("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
-                        service_->showScreenTimeout();
+                        if(remainingTimeInMinutes <= 0) {
+                            logInfo("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
+                            service_->showScreenTimeout();
+                        }
+                    } else {
+                        logDebug("[Monitor] No user found\n");
                     }
-                } else {
-                    logDebug("[Monitor] No user found\n");
                 }
             } else {
                 logDebug("[Monitor] No title running\n");
