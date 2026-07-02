@@ -18,7 +18,11 @@ using namespace alefbet::pctrl::database;
 extern "C" {
 #endif
 
-    constexpr size_t TotalHeapSize = ams::util::AlignUp(2500_KB, ams::os::MemoryHeapUnitSize);
+    // FIX: 使用静态 inner heap（sys-clk/nx-ovlloader 标准模式）
+    // 之前用 svcSetHeapSize 申请 4MB 堆，在 boot2 阶段可能占用过多内存
+    constexpr size_t INNER_HEAP_SIZE = 0x80000; // 512KB
+    char nx_inner_heap[INNER_HEAP_SIZE];
+    size_t nx_inner_heap_size = INNER_HEAP_SIZE;
 
     constexpr size_t ThreadServiceStackRequiredSizeBytes = ams::util::AlignUp(256_KB, 128);
     constexpr size_t ThreadServiceStackRequiredSizeAligned = ams::util::AlignUp(ThreadServiceStackRequiredSizeBytes, ams::os::MemoryPageSize);
@@ -29,7 +33,8 @@ extern "C" {
     alignas(ams::os::MemoryPageSize) constinit u8 g_thread_service_memory[ThreadServiceStackRequiredSizeAligned];
     alignas(ams::os::MemoryPageSize) constinit u8 g_thread_monitor_memory[ThreadMonitorStackRequiredSizeAligned];
 
-    // Minimize fs resource usage
+    // Minimize fs resource usage (sys-clk/nx-ovlloader 标准设置)
+    u32 __nx_fs_num_sessions = 1;
     u32 __nx_fsdev_direntry_cache_size = 1;
     bool __nx_fsdev_support_cwd = false;
 
@@ -50,18 +55,20 @@ extern "C" {
         return rc;
     }
 
+    // FIX: 使用静态 inner heap，不再调用 svcSetHeapSize
+    // sys-clk 和 nx-ovlloader 都使用这种方式
     void __libnx_initheap(void)
     {
+        void* addr = nx_inner_heap;
+        size_t size = nx_inner_heap_size;
         extern char* fake_heap_start;
-        extern char* fake_heap_end;        
-        void* addr = nullptr;
-        Result rc = svcSetHeapSize(&addr, TotalHeapSize);
-        if(R_SUCCEEDED(rc)) {
-            fake_heap_start = (char*)addr;
-            fake_heap_end   = fake_heap_start + TotalHeapSize;
-        }
+        extern char* fake_heap_end;
+        fake_heap_start = (char*)addr;
+        fake_heap_end   = (char*)addr + size;
     }
 
+    // FIX: __appInit 严格遵循 sys-clk 模式 — 只做 sm + setsys
+    // fs/fsdevMountSdmc 推迟到 main() 中执行
     void __appInit(void)
     {
         Result rc;
@@ -78,41 +85,17 @@ extern "C" {
                 hosversionSet(MAKEHOSVERSION(fw.major, fw.minor, fw.micro));
             setsysExit();
         }
+    }
 
-        rc = fsInitialize();
-        if (R_FAILED(rc))
-            fatalThrow(MAKERESULT(Module_HomebrewLoader, 2));
-
-        // FIX: 挂载 SD 卡文件系统，这是 sysmodule 读取配置/日志/数据库的前提
-        // 所有文件操作（logger/database/helpers）都依赖 SD 卡
-        fsdevMountSdmc();
+    void __appExit(void)
+    {
+        smExit();
     }
 
     void __wrap_exit(void)
     {
-        // FIX: 移除 smExit()，sm 会在进程退出时自动清理
         svcExitProcess();        
         __builtin_unreachable();
-    }
-
-    void testMemory() {
-        int on_stack = 0;
-        int* on_heap = new int(0);
-
-        extern char* fake_heap_start;
-        extern char* fake_heap_end;
-
-        //Memory allocation test
-        /*for(int s = 0x1000 ; s <= 0x150000 ; s += 5000) {
-            void* ptr = aligned_alloc(0x1000, s);
-            if(ptr != nullptr) {
-                logDebug("Allocation of %i bytes succeeded. @ptr=%p\n", s, (void*)ptr);
-                free(ptr);
-            } else {
-                logDebug("Allocation of %i bytes failed\n", s);    
-                break;                                            
-            }            
-        } */
     }
 
 
@@ -134,12 +117,37 @@ namespace alefbet::pctrl {
         monitor->loop();
     }
 
+    // FIX: 等待 qlaunch 就绪（sys-clk 的 WaitForQLaunch 模式）
+    void waitForQLaunch() {
+        u64 pid = 0;
+        Result rc;
+        int attempts = 0;
+        do {
+            rc = pmdmntGetProcessId(&pid, 0x0100000000000023ULL);
+            if(R_SUCCEEDED(rc) && pid != 0) {
+                logInfo("[Main] qlaunch is ready (pid=%llu)\n", pid);
+                return;
+            }
+            svcSleepThread(500'000'000); // 500ms
+            attempts++;
+        } while(attempts < 60); // 最多 30 秒
+        
+        logError("[Main] qlaunch not detected after 30s, starting anyway\n");
+    }
+
 }
 
 int main(int argc, char **argv)
 {    
     if (hosversionBefore(9,0,0))
         exit(1);
+
+    // FIX: fsInitialize + fsdevMountSdmc 在这里执行（sys-clk 模式）
+    // 不在 __appInit 中执行，避免 boot2 阶段的 FS 冲突
+    Result rc = fsInitialize();
+    if (R_FAILED(rc))
+        fatalThrow(MAKERESULT(Module_HomebrewLoader, 2));
+    fsdevMountSdmc();
 
     clearLog();
     auto settings = loadSettings();
@@ -152,40 +160,19 @@ int main(int argc, char **argv)
 
     logInfo("[Main] Parental control starting\n");
 
-    // FIX: 采用 sys-clk 标准模式 — 等待 HOME Menu (qlaunch) 完全启动后
-    // 再注册 IPC 服务和启动 Monitor
-    // boot2 阶段 qlaunch 尚未启动，此时注册服务/调用 pmdmnt 会导致冲突
-    logInfo("[Main] Waiting for qlaunch to be ready\n");
-    
-    // 初始化 pmdmnt 以便轮询 qlaunch 状态
+    // FIX: 初始化 pmdmnt 并等待 qlaunch 就绪（sys-clk 标准模式）
     pmdmntInitialize();
     
-    // 等待 HOME Menu (qlaunch, title_id=0x0100000000000023) 启动
-    // 最多等待 30 秒
-    {
-        u64 qlaunch_pid = 0;
-        for(int i = 0; i < 60; i++) {
-            // pmdmntGetProcessId 可以获取 qlaunch 的 PID
-            if(R_SUCCEEDED(pmdmntGetProcessId(&qlaunch_pid, 0x0100000000000023ULL)) && qlaunch_pid != 0) {
-                logInfo("[Main] qlaunch is ready (pid=%llu)\n", qlaunch_pid);
-                break;
-            }
-            svcSleepThread(500'000'000); // 500ms
-        }
-        if(qlaunch_pid == 0) {
-            logError("[Main] qlaunch not detected after 30s, starting anyway\n");
-        }
-    }
+    logInfo("[Main] Waiting for qlaunch to be ready\n");
+    alefbet::pctrl::waitForQLaunch();
 
-    // 再额外等待 2 秒让 HOME Menu 完全初始化
+    // 额外等待 2 秒让 HOME Menu 完全初始化
     svcSleepThread(2'000'000'000LL);
 
     // 初始化 ns 服务
     nsInitialize();
 
-    ::Result rc = 0;
-
-    // 现在注册 IPC 服务，overlay 可以连接
+    // 现在注册 IPC 服务并启动 Monitor
     Ipc::Server* ipcServer = new Ipc::Server("pctrl");
     alefbet::pctrl::srv::Service* service = new alefbet::pctrl::srv::Service(ipcServer);    
 
@@ -209,7 +196,7 @@ int main(int argc, char **argv)
         logError("Could not create the monitor thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
         return 4;
     }
-    rc = threadStart(&threadMonitor); // Run the monitor's loop
+    rc = threadStart(&threadMonitor);
     if(R_FAILED(rc)) {
         logError("Could not start the monitor thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
         return 5;
