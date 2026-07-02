@@ -253,6 +253,17 @@ namespace alefbet::pctrl::database {
 
             logDebug("[Database] Sessions data: %s\n", data);
             logDebug("[Database] Parse sessions file\n");
+
+            // FIX: 在 -fno-exceptions 下，json::parse() 遇到无效 JSON 会调用 std::terminate() 导致崩溃
+            // 使用 json::accept() 先验证数据是否为有效 JSON
+            if(!json::accept(data)) {
+                logError("[Database] Invalid JSON in database file. Ignoring.\n");
+                fsFileClose(&handle_database_);
+                delete[] data;
+                data_synchronized_ = true; // 标记为已同步，避免反复尝试解析损坏的数据
+                return;
+            }
+
             json j_data = json::parse(data);
 
             // Verify database integrity
@@ -265,9 +276,24 @@ namespace alefbet::pctrl::database {
                 logInfo("[Database] Database file integrity is compromized. The hash is missing\n");
             }            
 
+            // FIX: 安全地检查 "history" 键是否存在
+            if(!j_data.contains("history") || !j_data["history"].is_array()) {
+                logError("[Database] Database file has no 'history' array. Ignoring.\n");
+                fsFileClose(&handle_database_);
+                delete[] data;
+                data_synchronized_ = true;
+                return;
+            }
+
             std::vector<json> j_entries = j_data["history"].get<std::vector<json>>();            
 
-            for(const auto& j_entry: j_entries) {                
+            for(const auto& j_entry: j_entries) {
+                // FIX: 安全地检查每个键是否存在
+                if(!j_entry.contains("uid") || !j_entry.contains("date") || 
+                   !j_entry.contains("title_id") || !j_entry.contains("duration_in_min")) {
+                    logError("[Database] A history entry is malformed. Skipping.\n");
+                    continue;
+                }
                 auto uidAsString = j_entry["uid"].get<std::string>();
                 auto date = j_entry["date"].get<std::string>();
                 auto titleId = j_entry["title_id"].get<u64>();
@@ -329,12 +355,11 @@ namespace alefbet::pctrl::database {
         }
 
         const auto stdstr_data = j_history.dump();
-        //const auto str_data = stdstr_data.c_str();
         u64 lenstr = stdstr_data.length();
-        void* s_data = malloc(lenstr+1);
-        memset(s_data, 0, lenstr);
-        //memcpy(s_data, str_data, lenstr);
-        std::snprintf((char*)s_data, lenstr, "%s", stdstr_data.c_str());
+        // FIX: 直接使用 string 的 c_str() 写入，避免 snprintf 截断 bug
+        // 之前的 snprintf(buf, lenstr, ...) 只写入 lenstr-1 个字符，导致最后一个 '}' 被 '\0' 替换
+        // 下次 loadDatabase() 读取时 json::parse() 会抛出异常，在 -fno-exceptions 下导致崩溃
+        const char* s_data = stdstr_data.c_str();
 
         logDebug("[Database] Writing sessions data %s (size=%i)\n", s_data, lenstr);    
 
@@ -343,7 +368,6 @@ namespace alefbet::pctrl::database {
         }
 
         fsFileClose(&handle_database_);
-        free(s_data);
     }    
 
     std::vector<HistoryEntry> getHistory(AccountUid uid, std::string date) {
@@ -464,6 +488,16 @@ namespace alefbet::pctrl::database {
 
             logDebug("[Database] Settings data: %s\n", data_settings);
             logDebug("[Database] Parse settings file\n");
+
+            // FIX: 在 -fno-exceptions 下，json::parse() 遇到无效 JSON 会调用 std::terminate() 导致崩溃
+            if(!json::accept(data_settings)) {
+                logError("[Database] Invalid JSON in settings file. Using defaults.\n");
+                fsFileClose(&handle_settings_);
+                delete[] data_settings;
+                settings_synchronized_ = true;
+                return settings_;
+            }
+
             json j_settings = json::parse(data_settings);
 
             if(j_settings.contains("hash")) {

@@ -58,8 +58,9 @@ namespace alefbet {
                         if (this->m_initialized)
                             return;
 
-                        Result rc = smInitialize();
-                        rc = viInitialize(ViServiceType_Manager);
+                        // FIX: smInitialize() 已在 __appInit 中调用，无需重复
+                        // viInitialize 内部会使用 sm session
+                        Result rc = viInitialize(ViServiceType_Manager);
                         logDebug("viInitialize %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = viOpenDefaultDisplay(&this->m_display);
                         logDebug("viOpenDefaultDisplay %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
@@ -84,7 +85,7 @@ namespace alefbet {
                         rc = setInitialize();
                         rc = initFonts();
                         setExit();
-                        smExit();
+                        // FIX: 移除 smExit() — sm session 由 __appInit 管理
 
                         this->m_initialized = true;
                     }        

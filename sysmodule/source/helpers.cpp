@@ -10,6 +10,7 @@
 #include <codecvt>
 #include <switch.h>
 #include <algorithm>
+#include <cerrno>   // FIX: strtoull 需要 errno
 #include "logger.h"
 #include "database/database.h"
 #include "ams_bpc.h"
@@ -51,8 +52,25 @@ namespace alefbet::pctrl::helpers {
             return uid;
         }
 
-        uid.uid[0] = std::stoull(parts[0]);
-        uid.uid[1] = std::stoull(parts[1]);
+        // FIX: std::stoull 在输入无效时会抛出异常，在 -fno-exceptions 下会导致崩溃
+        // 改用 strtoull 进行安全的转换
+        errno = 0;
+        char* endptr = nullptr;
+        unsigned long long val0 = strtoull(parts[0].c_str(), &endptr, 10);
+        if(errno != 0 || endptr == parts[0].c_str()) {
+            logError("[Helpers] Invalid UID part: %s\n", parts[0].c_str());
+            return uid;
+        }
+        errno = 0;
+        endptr = nullptr;
+        unsigned long long val1 = strtoull(parts[1].c_str(), &endptr, 10);
+        if(errno != 0 || endptr == parts[1].c_str()) {
+            logError("[Helpers] Invalid UID part: %s\n", parts[1].c_str());
+            return uid;
+        }
+
+        uid.uid[0] = val0;
+        uid.uid[1] = val1;
 
         return uid;
     }
@@ -283,7 +301,7 @@ namespace alefbet::pctrl::helpers {
         logInfo("[Helpers] Try to reboot to payload\n");
       
         u8 *g_reboot_payload = new u8[IRAM_PAYLOAD_MAX_SIZE];
-        smInitialize();
+        // FIX: smInitialize() 已在 __appInit 中调用，无需重复
         if(!readPayloadFile(g_reboot_payload, IRAM_PAYLOAD_MAX_SIZE)) {
             logError("[Helpers] No payload, shutting down.");
             bpcShutdownSystem();
@@ -297,7 +315,8 @@ namespace alefbet::pctrl::helpers {
             return false;
         }
         
-        smExit(); //Required to connect to ams:bpc       
+        // FIX: 移除 smExit() — ams:bpc 通过 svcConnectToNamedPort 连接，不需要关闭 sm
+        // 关闭 sm 会影响 sysmodule 中其他正在使用 sm 的线程
 
         rc = amsBpcInitialize();
         if (R_FAILED(rc)) {
@@ -388,7 +407,13 @@ namespace alefbet::pctrl::helpers {
                 return titles;
             }
 
-            json j_blacklist = json::parse(blacklist);
+            json j_blacklist;
+            // FIX: 安全的 JSON 解析
+            if(!json::accept(blacklist)) {
+                logError("[Helpers] Invalid JSON in blacklist setting\n");
+                return titles;
+            }
+            j_blacklist = json::parse(blacklist);
 
             if(j_blacklist.contains(userId)) {
                 std::vector<u64> j_titlesList = j_blacklist[userId];                
@@ -419,6 +444,11 @@ namespace alefbet::pctrl::helpers {
             auto& setting = settings[SETTING_BLACKLIST];
 
             // We replace the values for the user
+            // FIX: 安全的 JSON 解析
+            if(!json::accept(setting.string_value)) {
+                logError("[Helpers] Invalid JSON in blacklist setting (addToBlacklist)\n");
+                return;
+            }
             auto j_setting = json::parse(setting.string_value);
             j_setting[userId] = userBlacklist;            
             
@@ -464,6 +494,11 @@ namespace alefbet::pctrl::helpers {
             auto& setting = settings[SETTING_BLACKLIST];
 
             // We replace the values for the user
+            // FIX: 安全的 JSON 解析
+            if(!json::accept(setting.string_value)) {
+                logError("[Helpers] Invalid JSON in blacklist setting (removeFromBlacklist)\n");
+                return;
+            }
             auto j_setting = json::parse(setting.string_value);
             j_setting[userId] = userBlacklist;            
             
@@ -495,6 +530,11 @@ namespace alefbet::pctrl::helpers {
                 return 0;
             }
 
+            // FIX: 安全的 JSON 解析
+            if(!json::accept(limits)) {
+                logError("[Helpers] Invalid JSON in daily limit setting\n");
+                return 0;
+            }
             json j_limits = json::parse(limits);
 
             if(j_limits.contains(userId)) {
@@ -515,6 +555,11 @@ namespace alefbet::pctrl::helpers {
             auto& setting = settings[SETTING_DAILY_LIMIT_USERS];
 
             // We replace the value for the user
+            // FIX: 安全的 JSON 解析
+            if(!json::accept(setting.string_value)) {
+                logError("[Helpers] Invalid JSON in daily limit setting (setDailyLimitForUser)\n");
+                return;
+            }
             auto j_setting = json::parse(setting.string_value);
             j_setting[userId] = limit_in_minutes;            
             

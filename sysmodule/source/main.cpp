@@ -96,12 +96,14 @@ extern "C" {
         hidsysInitialize();
         pmdmntInitialize();
         nsInitialize();
-        smExit();
+        // FIX: 删除 smExit() — 不能在 __appInit 中关闭 sm 会话
+        // Ipc::Server 构造函数需要 sm session 来注册 "pctrl" 服务
+        // 在 __appInit 末尾调用 smExit() 会导致后续 smRegisterService 失败
     }
 
     void __wrap_exit(void)
     {
-        smExit(); 
+        // FIX: 移除 smExit()，sm 会在进程退出时自动清理
         svcExitProcess();        
         __builtin_unreachable();
     }

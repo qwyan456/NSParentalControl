@@ -32,7 +32,8 @@ namespace Ipc {
         // Create server
         Handle serverHandle;
         this->serverName = smEncodeName(name.c_str());
-        smInitialize();
+        // FIX: smInitialize() 已在 __appInit() 中调用，此处无需重复
+        // 重复调用虽然因引用计数不会直接崩溃，但可能导致状态不一致
         ::Result rc = smRegisterService(&serverHandle, this->serverName, false, maxClients);
         if (R_FAILED(rc)) {
             logError("[IPC] Couldn't create server: %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
@@ -184,6 +185,6 @@ namespace Ipc {
             }
         }
 
-        smExit();
+        // FIX: 移除 smExit() — sm session 由 __appInit 管理，不应在 Server 析构时关闭
     }
 }
