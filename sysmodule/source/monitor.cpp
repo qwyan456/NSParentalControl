@@ -112,7 +112,13 @@ namespace alefbet::pctrl::srv {
 
                         if(remainingTimeInMinutes <= 0) {
                             logInfo("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
-                            service_->showScreenTimeout();
+                            // v1.3.5: 不再渲染全屏超时界面。sysmodule 内存受限，1.9MB 帧缓冲
+                            // 无法分配（aligned_alloc/tmemCreate 在 512KB 进程堆上失败；
+                            // svcSetHeapSize 在 AMS 1.10.3 下被内核拒绝 rc=1:101）。
+                            // 改为：弹轻量系统提示 + 直接终止前台游戏，回到 HOME Menu，强制限玩。
+                            NotificationsController::notifyTimeExpired();
+                            svcSleepThread(2'000'000'000); // 让提示先显示约 2 秒
+                            terminateCurrentApplication();
                         }
                     } else {
                         logDebug("[Monitor] No user found\n");

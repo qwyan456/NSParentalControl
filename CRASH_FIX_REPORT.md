@@ -176,3 +176,37 @@
 ### v1.3.4 修改的文件
 1. `sysmodule/source/gui/screen_timeout.cpp` — 帧缓冲改由 `svcSetHeapSize` 扩展的系统内存堆分配（修超时界面画不出）
 2. `sysmodule/Makefile` — APP_VERSION 1.3.3 → 1.3.4
+
+---
+
+## v1.3.5-fix：v1.3.4 的 svcSetHeapSize 也被内核拒绝 → 放弃全屏界面，超时直接终止游戏
+
+### P0：svcSetHeapSize 在 sysmodule 上下文被内核拒绝（rc=1:101），全屏帧缓冲方案彻底走不通
+- **文件**: `sysmodule/source/gui/screen_timeout.cpp` → `monitor.cpp`
+- **问题**: 用户实测 v1.3.4 仍"时间到了没出提示"。新日志（v1.3.4 构建）第 246 行：
+  ```
+  [Screen timeout] svcSetHeapSize failed (rc=1:101)
+  ```
+  `rc=1:101` 是**内核**错误（模块 1=Kernel）。在 Atmosphère 1.10.3 / FW 21.2.0 的
+  sysmodule 上下文下，运行时扩展进程堆被内核拒绝。叠加此前 v1.3.1/1.3.2 的
+  `aligned_alloc`、v1.3.3 的 `tmemCreate` 均失败，结论是：**1.9MB 全屏帧缓冲在这套
+  sysmodule 内存环境里根本分配不出来**，硬渲染是死路。
+- **修复（设计转向）**: 用户建议"弹轻量提示 + 直接关闭游戏"。超时不再渲染画面，改为：
+  1. 弹系统通知 toast（走 `UltraHandInterface::writeNotification`，**不需要帧缓冲**）：
+     `"Time's up! The game will close."`；
+  2. 等待约 2 秒让提示显示；
+  3. 直接终止前台游戏：`terminateCurrentApplication()`（内部 `pmshellTerminateProgram(titleId)`，
+     helpers.cpp 已有实现），用户回到 HOME Menu。
+  - 限玩依然生效：重新打开游戏后，monitor 检测到当日已用尽会再次终止。
+  - 彻底绕开帧缓冲 / nvmap / svcSetHeapSize 的全部内存问题；512KB 静态堆与 boot2 安全不变。
+- **修改点**:
+  - `notifications_controller.cpp/.h`：新增 `notifyTimeExpired()`（轻量 toast）。
+  - `monitor.cpp`：超时分支 `service_->showScreenTimeout()` 改为
+    `notifyTimeExpired()` + `svcSleepThread(2s)` + `terminateCurrentApplication()`。
+  - `Makefile`：APP_VERSION 1.3.4 → 1.3.5。
+  - `ScreenTimeout` 全屏渲染代码保留但未再被调用（dead code，无害；后续可清理）。
+
+### v1.3.5 修改的文件
+1. `sysmodule/source/notifications_controller.cpp` / `.h` — 新增 `notifyTimeExpired()`（轻量 toast）
+2. `sysmodule/source/monitor.cpp` — 超时改为弹提示 + 终止游戏（不再渲染全屏界面）
+3. `sysmodule/Makefile` — APP_VERSION 1.3.4 → 1.3.5

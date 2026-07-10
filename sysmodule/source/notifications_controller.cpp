@@ -19,6 +19,12 @@ void NotificationsController::notifyRemainingTime(int remainingTimeInMinutes)
     UltraHandInterface::writeNotification(message);
 }
 
+void NotificationsController::notifyTimeExpired()
+{
+    UltraHandInterface::drawAttention();
+    UltraHandInterface::writeNotification("Time's up! The game will close.");
+}
+
 std::string NotificationsController::formatTime(int duration_in_minutes) {
     const auto& duration = minutes{duration_in_minutes};
     auto hoursPart = duration_cast<hours>(duration);
