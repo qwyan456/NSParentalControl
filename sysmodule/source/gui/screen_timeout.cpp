@@ -28,13 +28,8 @@ namespace alefbet::pctrl::gui {
         constexpr size_t FrameBufferRequiredSizePageAligned = util::AlignUp(FrameBufferRequiredSizeBytes, os::MemoryPageSize);
         constexpr size_t FrameBufferRequiredSizeHeapAligned = util::AlignUp(FrameBufferRequiredSizeBytes, os::MemoryHeapUnitSize);
 
-        constinit u8 *g_framebuffer_pointer = nullptr;      
+        constinit u8 *g_framebuffer_pointer = nullptr;
 
-        /* 帧缓冲改为用 TransferMemory 分配（系统 RAM，运行时按需分配），
-           不占用 512KB 的静态 inner heap，避免 boot2 阶段因堆过大导致 qlaunch 崩溃。 */
-        TransferMemory g_framebuffer_tmem;
-        bool g_framebuffer_tmem_created = false;
-        
         bool sharedFontInitialized = false;
     }      
     
@@ -53,23 +48,43 @@ namespace alefbet::pctrl::gui {
     }
 
     void ScreenTimeout::InitializeFrameBufferPointer() {
-        /* 已分配则直接复用，避免重复创建 TransferMemory 泄漏句柄 */
+        /* 已分配则直接复用，避免重复扩展堆 */
         if(g_framebuffer_pointer != nullptr) {
             return;
         }
 
-        /* FIX: 之前用 aligned_alloc() 从 512KB 静态 inner heap 分配 ~1.9MB 帧缓冲，
-           必然失败（"Could not allocate 1966080 bytes of memory"）。改为用 TransferMemory
-           从系统 RAM 分配，运行时按需申请，不影响 boot2 阶段内存。 */
-        ::Result rc = tmemCreate(std::addressof(g_framebuffer_tmem), FrameBufferRequiredSizePageAligned, Perm_Rw);
+        /* FIX (v1.3.4): 帧缓冲约 1.9MB，此前用 aligned_alloc / tmemCreate 从 512KB 静态
+           inner heap 分配必然失败。注意 tmemCreate 的 backing 内存同样来自进程堆（见
+           libnx tmem.h 注释 "the user process allocates and owns its backing memory"），
+           所以它和 aligned_alloc 一样会在 512KB 堆上失败（日志 rc=345:2），并非系统 RAM。
+           正确做法：运行时用 svcSetHeapSize 把进程堆扩展到【系统内存】——既不增大静态
+           BSS（boot2 安全），也不占用 512KB inner heap。扩展发生在首次需要超时界面的
+           时刻（此时 qlaunch 早已启动，内存充足）。再从扩展区域的顶部切出页对齐帧缓冲。 */
+        const size_t fb_size = FrameBufferRequiredSizePageAligned;
+
+        u64 cur_heap_size = 0;
+        ::Result rc = svcGetInfo(&cur_heap_size, InfoType_HeapRegionSize, CUR_PROCESS_HANDLE, 0);
         if(R_FAILED(rc)) {
-            logError("[Screen timeout] Could not allocate %zu bytes of TransferMemory (rc=%i:%i)\n",
-                     FrameBufferRequiredSizePageAligned, R_MODULE(rc), R_DESCRIPTION(rc));
+            logError("[Screen timeout] svcGetInfo(HeapRegionSize) failed (rc=%i:%i)\n",
+                     R_MODULE(rc), R_DESCRIPTION(rc));
             return;
         }
 
-        g_framebuffer_tmem_created = true;
-        g_framebuffer_pointer = static_cast<u8*>(tmemGetAddr(std::addressof(g_framebuffer_tmem)));
+        /* svcSetHeapSize 的 size 必须是 0x200000(2MB) 的倍数，返回的新堆顶会按 2MB 对齐。
+           对齐到 2MB 后，从顶部切出的帧缓冲仍落在 [base, heap_end) 内且页对齐。 */
+        const u64 new_heap_size = util::AlignUp(cur_heap_size + static_cast<u64>(fb_size), 0x200000);
+        void* heap_end = nullptr;
+        rc = svcSetHeapSize(&heap_end, new_heap_size);
+        if(R_FAILED(rc)) {
+            logError("[Screen timeout] svcSetHeapSize failed (rc=%i:%i)\n",
+                     R_MODULE(rc), R_DESCRIPTION(rc));
+            return;
+        }
+
+        /* 从新扩展区域顶部切出帧缓冲（heap_end 与 fb_size 均页对齐 → 结果页对齐）。 */
+        g_framebuffer_pointer = static_cast<u8*>(heap_end) - fb_size;
+        logInfo("[Screen timeout] Allocated %zu-byte framebuffer at %p (heap end %p)\n",
+                fb_size, (void*)g_framebuffer_pointer, heap_end);
     }
 
     /* Task implementations. */

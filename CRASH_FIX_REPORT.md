@@ -133,3 +133,46 @@
 1. `sysmodule/source/main.cpp` — `INNER_HEAP_SIZE` 4MB → **回退 512KB**（修 boot2 开机崩溃）
 2. `sysmodule/source/gui/screen_timeout.cpp` — 帧缓冲改走 TransferMemory（不再依赖大静态堆）
 3. `sysmodule/Makefile` — APP_VERSION 1.3.2 → 1.3.3
+
+---
+
+## v1.3.4-fix：v1.3.3 的 TransferMemory 方案仍失败（超时界面画不出）
+
+### P0：tmemCreate 的 backing 内存同样来自 512KB 进程堆 → 1.9MB 帧缓冲仍分配失败
+- **文件**: `sysmodule/source/gui/screen_timeout.cpp`（`InitializeFrameBufferPointer`）
+- **问题**: 用户实测 v1.3.3"时间到了却没出提示"。新日志（v1.3.3 构建）显示：
+  ```
+  [Screen timeout] Could not allocate 1966080 bytes of TransferMemory (rc=345:2)
+  [Screen] The framebuffer pointer is null. Aborting.
+  [Screen] Could not create Map          ← Error 345:11（nvMapCreate 拿到 null 的级联）
+  [Screen] PrepareScreenForDrawing failed
+  ```
+  `rc=345:2` 是 libnx 模块错误。根因：libnx `tmem.h` 注释明确
+  "the user process allocates and owns its backing memory"——`tmemCreate` 的内部
+  backing buffer 来自**进程自己的堆**（sysmodule 即 512KB 静态 inner heap）。所以它和
+  `aligned_alloc` 一样，在 512KB 堆上分配 1.9MB **必然失败**。v1.3.3 对 `tmemCreate`
+  等于"系统 RAM"的假设是**错的**；真正的失败链与 v1.3.1 完全相同（只是错误文案从
+  "Could not allocate ... memory" 变成 "Could not allocate ... TransferMemory"）。
+- **修复**: 改用 `svcSetHeapSize` 在**运行时把进程堆扩展到系统内存**（非静态 BSS、非
+  inner heap），从扩展区域顶部切出页对齐帧缓冲：
+  ```cpp
+  u64 cur_heap_size = 0;
+  svcGetInfo(&cur_heap_size, InfoType_HeapRegionSize, CUR_PROCESS_HANDLE, 0);
+  const u64 new_heap_size = util::AlignUp(cur_heap_size + fb_size, 0x200000); // 必须 2MB 倍数
+  void* heap_end = nullptr;
+  svcSetHeapSize(&heap_end, new_heap_size);
+  g_framebuffer_pointer = static_cast<u8*>(heap_end) - fb_size;
+  ```
+  - `svcSetHeapSize` 的 size **必须是 0x200000(2MB) 的倍数**（已对齐），否则 SVC 失败；
+  - 扩展发生在**首次需要超时界面时**（qlaunch 早已启动、内存充足），不动 boot2 阶段内存
+    → **开机安全**（inner heap 维持 512KB 不变）；
+  - `nvMapCreate(..., is_cpu_cacheable=true)` 使用我们提供的 `g_framebuffer_pointer` 作
+    显存底背（该参数不是"由 nvmap 分配"），故有效指针即可正常渲染，不再级联 `Error 345:11`。
+- **验证方式**: 因 exefs.nsp(NSO) 的只读数据段被压缩，`strings` 不可靠；改为在**未压缩的
+  `pctrl.elf`** 中确认：新字符串 `svcSetHeapSize failed` / `svcGetInfo(HeapRegionSize)
+  failed` / `Allocated %zu-byte framebuffer` / `framebuffer at %p (heap end` 均存在，
+  旧的 `Could not allocate %zu bytes of TransferMemory` 已消失。
+
+### v1.3.4 修改的文件
+1. `sysmodule/source/gui/screen_timeout.cpp` — 帧缓冲改由 `svcSetHeapSize` 扩展的系统内存堆分配（修超时界面画不出）
+2. `sysmodule/Makefile` — APP_VERSION 1.3.3 → 1.3.4
