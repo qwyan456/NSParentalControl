@@ -229,11 +229,21 @@ namespace alefbet::pctrl::helpers {
         return std::string(langEntry->name);
     }
 
-    std::string today() {        
-        ::Result rc = timeInitialize();
-        if(R_FAILED(rc)) {
-            logError("[Helpers] Could not connect to time service\n");
-            return "";
+    std::string today() {
+        // FIX: time 服务只初始化一次，避免每调用一次就泄漏一个 session。
+        // 之前每次调用 today() 都 timeInitialize() 而不 timeExit()，
+        // 导致 time 服务 session 被耗尽（约数十次后 timeInitialize() 失败），
+        // 进而 today() 返回 ""，addToHistory() 提前返回，统计静默停止。
+        // sysmodule 进程本身不会崩溃，只是不再累加时长。
+        static bool timeReady = false;
+        ::Result rc;
+        if(!timeReady) {
+            rc = timeInitialize();
+            if(R_FAILED(rc)) {
+                logError("[Helpers] Could not connect to time service\n");
+                return "";
+            }
+            timeReady = true;
         }
 
         u64 ts;

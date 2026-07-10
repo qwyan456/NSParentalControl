@@ -57,3 +57,24 @@
 3. `sysmodule/source/main.cpp` — __appInit/__wrap_exit smExit 修复
 4. `sysmodule/source/ipc/Server.cpp` — smInitialize/smExit 修复
 5. `sysmodule/source/gui/renderer.hpp` — smInitialize/smExit 修复
+
+---
+
+## v1.3.1-fix：统计一段时间后停止（time 服务句柄泄漏）
+
+### P0：today() 每次调用都 timeInitialize() 而不 timeExit() → 句柄泄漏 → 统计静默停止
+- **文件**: `sysmodule/source/helpers.cpp`（`today()`）
+- **问题**: monitor 循环每轮通过 `addToHistory()` 和 `getUserUsageTimeForToday()` 共调用 `today()` **两次**，每次都 `timeInitialize()` 打开一个 `time:` 服务 session 却从不 `timeExit()`。Switch 的 time 服务 session 数量有限，耗尽后 `timeInitialize()` 失败，`today()` 返回 `""`，`addToHistory()` 因 `date.empty()` 提前返回 → **统计停止累加**。sysmodule 进程本身不崩溃（循环仍在跑），只是不再计时。
+- **表现**: 开机/UI 正常，运行约数十分钟后时长不再增长（与用户反馈"统计一段时间后就不再统计"完全吻合）。
+- **修复**: `today()` 改为惰性 `static bool timeReady`，只在首次调用时 `timeInitialize()` 一次，之后复用该 session，不再泄漏。
+- **附加**: `monitor.cpp` 新增每 10 分钟一条 INFO 心跳日志 `[Monitor] Heartbeat: monitoring still active (loop #N)`，便于确认 sysmodule 是否存活。
+
+### 关于上传的崩溃日志 `01783012165_0100000000000023.log`
+- 文件名中的 `0100000000000023` 是 **HOME Menu（qlaunch）** 的 title_id，因此这是 qlaunch 的崩溃报告（错误 2001-0132 / 0x10801，User Break），**不是** parental control sysmodule（4200000000003103）。
+- 该日志仅包含 qlaunch 自身模块，无法据此判断 sysmodule 是否崩溃；与"统计停止"是两个独立问题（统计停止由上面的 time 句柄泄漏导致，sysmodule 并未崩溃）。
+- 如需排查 qlaunch 崩溃，需提供：`/config/parental_control/sysmodule.log`、`/atmosphere/crash_reports/` 中标题含 `4200000000003103` 的日志（若有）、以及崩溃时是否正打开 parental_control overlay。
+
+### v1.3.1 修改的文件
+1. `sysmodule/source/helpers.cpp` — `today()` 改为只初始化一次 time 服务（修漏）
+2. `sysmodule/source/monitor.cpp` — 新增心跳日志
+3. `sysmodule/Makefile` — APP_VERSION 1.3 → 1.3.1

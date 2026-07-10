@@ -42,6 +42,16 @@ namespace alefbet::pctrl::srv {
             }
             
             logDebug("[Monitor] Monitoring loop has started\n");
+
+            // 心跳：每 10 分钟（10 次循环）输出一条 INFO 日志，
+            // 便于确认 sysmodule 仍在运行（而非静默停止/崩溃）
+            {
+                static int heartbeatCounter = 0;
+                if((++heartbeatCounter % 10) == 0) {
+                    logInfo("[Monitor] Heartbeat: monitoring still active (loop #%i)\n", heartbeatCounter);
+                }
+            }
+
             auto settings = loadSettings();
 
             // Verify whether the service is enabled
