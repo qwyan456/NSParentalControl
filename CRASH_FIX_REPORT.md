@@ -78,3 +78,26 @@
 1. `sysmodule/source/helpers.cpp` — `today()` 改为只初始化一次 time 服务（修漏）
 2. `sysmodule/source/monitor.cpp` — 新增心跳日志
 3. `sysmodule/Makefile` — APP_VERSION 1.3 → 1.3.1
+
+---
+
+## v1.3.2-fix：超时界面无法显示（静态堆 512KB 太小）
+
+### P0：showScreenTimeout() 分配 ~1.9MB 帧缓冲失败（512KB 静态堆不足）
+- **文件**: `sysmodule/source/main.cpp`（`INNER_HEAP_SIZE`）
+- **问题**: 修改前日志 `sysmodule.log` 暴露：用户达到每日限额时，`[Monitor] Timeout for the user ...` → `service_->showScreenTimeout()` 尝试分配 **1966080 字节(≈1.9MB, 0x1E0000)** 的全屏帧缓冲，但静态 inner heap 仅 **512KB(0x80000)**，分配失败：
+  ```
+  [Screen timeout] Could not allocate 1966080 bytes of memory
+  [Screen] The framebuffer pointer is null. Aborting.
+  [Screen] PrepareScreenForDrawing failed
+  ```
+  超时界面画不出来（sysmodule 自身不崩溃，错误被捕获处理，但用户看不到"时间到"提示）。
+- **修复**: `INNER_HEAP_SIZE` 512KB → **4MB(0x400000)**。boot 崩溃根因是 init 顺序(sm/fs)，与堆大小无关，扩容安全。
+- **附带结论（来自修改前 4 个日志）**:
+  - `sysmodule.log` 全程为正常 IPC 活动，**sysmodule 当时存活、未崩溃**；统计当时正常(usage=7/4 分)。→ 印证"统计停止"是后续 time 句柄泄漏耗尽 session 所致（v1.3.1 已修），且此前那份 qlaunch 崩溃日志(0100000000000023)与 sysmodule 无关。
+  - `sessions.json` / `settings.json` 均为**合法 JSON、无损坏**。
+  - `overlay.log` 连接/查询/退出均干净，**overlay 非崩溃源**；`[IPC] Couldn't receive request (closing handle): 62977` / `Received unexpected CmifCommand (2)` 为 overlay 断开/IPC 版本差异的良性噪声。
+
+### v1.3.2 修改的文件
+1. `sysmodule/source/main.cpp` — `INNER_HEAP_SIZE` 512KB → 4MB（修超时界面内存分配失败）
+2. `sysmodule/Makefile` — APP_VERSION 1.3.1 → 1.3.2

@@ -18,9 +18,12 @@ using namespace alefbet::pctrl::database;
 extern "C" {
 #endif
 
-    // FIX: 使用静态 inner heap（sys-clk/nx-ovlloader 标准模式）
-    // 之前用 svcSetHeapSize 申请 4MB 堆，在 boot2 阶段可能占用过多内存
-    constexpr size_t INNER_HEAP_SIZE = 0x80000; // 512KB
+    // FIX: 静态 inner heap（sys-clk/nx-ovlloader 标准模式）
+    // 之前 512KB(0x80000) 太小：showScreenTimeout() 渲染超时全屏界面需要
+    // 分配约 1.9MB(0x1E0000) 帧缓冲，512KB 堆无法满足 → "Could not allocate
+    // 1966080 bytes of memory"，超时界面画不出来。扩容到 4MB(0x400000)。
+    // 注意：boot 崩溃的根因是 init 顺序(sm/fs)，与堆大小无关，扩容安全。
+    constexpr size_t INNER_HEAP_SIZE = 0x400000; // 4MB
     char nx_inner_heap[INNER_HEAP_SIZE];
     size_t nx_inner_heap_size = INNER_HEAP_SIZE;
 
