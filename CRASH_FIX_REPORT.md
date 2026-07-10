@@ -101,3 +101,35 @@
 ### v1.3.2 修改的文件
 1. `sysmodule/source/main.cpp` — `INNER_HEAP_SIZE` 512KB → 4MB（修超时界面内存分配失败）
 2. `sysmodule/Makefile` — APP_VERSION 1.3.1 → 1.3.2
+
+> ⚠️ **修正**：v1.3.2 当时假设"boot 崩溃根因是 init 顺序，与堆大小无关，扩容安全" ——
+> **这个假设是错的**。4MB 静态 BSS 在 boot2 阶段抢占了 qlaunch 的常驻内存，正是 v1.3.3
+> 要修的开机崩溃根因。详见下方 v1.3.3。
+
+---
+
+## v1.3.3-fix：v1.3.2 的 4MB 静态堆触发 boot2 开机崩溃（回归修复）
+
+### P0：INNER_HEAP_SIZE 4MB 的静态 BSS 在 boot2 阶段饿死 qlaunch → 开机崩溃
+- **文件**: `sysmodule/source/main.cpp`（`INNER_HEAP_SIZE`）
+- **问题**: v1.3.2 把 `INNER_HEAP_SIZE` 从 512KB 扩到 4MB，静态 `nx_inner_heap[0x400000]`
+  BSS 段随之变大。sysmodule 走 `boot2.flag` 在 **qlaunch（0100000000000023）之前** 被加载，
+  这份 4MB 静态 BSS 在 boot2 阶段就常驻，挤占了 qlaunch 启动所需的常驻内存 →
+  开机崩溃（错误 2001-0132 / 0x10801，User Break）。
+- **诊断依据**: 用户上传的新 `sysmodule.log`（481 字节）显示 sysmodule 自身启动完全正常，
+  直到第 13 行 `[Monitoring] Parental control is now enabled.`，之后才崩溃 ——
+  说明崩溃发生在 sysmodule 之外（qlaunch 侧），由内存压力引发，而非 sysmodule 故障。
+- **修复**: 把两个需求**解耦**，不再用单一大静态堆同时满足：
+  1. `INNER_HEAP_SIZE` **回退 512KB(0x80000)** —— boot2 阶段静态 BSS 回到安全大小；
+  2. 超时界面的 ~1.9MB(0x1E0000) 帧缓冲改由 `sysmodule/source/gui/screen_timeout.cpp`
+     通过 **TransferMemory**（`tmemCreate` + `tmemGetAddr`，运行时向系统申请的匿名 RAM）
+     分配，而非从 inner heap `aligned_alloc`。TransferMemory 不占 boot2 静态 BSS，
+     故开机安全，又足够大能放下全屏帧缓冲。
+  3. 加"已分配则复用"守卫，避免每次超时重复申请造成句柄泄漏。
+- **关键认知**: 之前误以为"512KB 堆不够 → 必须扩大静态堆"是唯一解法。其实帧缓冲可以走
+  TransferMemory（系统运行时 RAM），与 boot2 静态堆是两个独立的内存池，不必互相挤占。
+
+### v1.3.3 修改的文件
+1. `sysmodule/source/main.cpp` — `INNER_HEAP_SIZE` 4MB → **回退 512KB**（修 boot2 开机崩溃）
+2. `sysmodule/source/gui/screen_timeout.cpp` — 帧缓冲改走 TransferMemory（不再依赖大静态堆）
+3. `sysmodule/Makefile` — APP_VERSION 1.3.2 → 1.3.3

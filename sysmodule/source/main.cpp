@@ -19,11 +19,11 @@ extern "C" {
 #endif
 
     // FIX: 静态 inner heap（sys-clk/nx-ovlloader 标准模式）
-    // 之前 512KB(0x80000) 太小：showScreenTimeout() 渲染超时全屏界面需要
-    // 分配约 1.9MB(0x1E0000) 帧缓冲，512KB 堆无法满足 → "Could not allocate
-    // 1966080 bytes of memory"，超时界面画不出来。扩容到 4MB(0x400000)。
-    // 注意：boot 崩溃的根因是 init 顺序(sm/fs)，与堆大小无关，扩容安全。
-    constexpr size_t INNER_HEAP_SIZE = 0x400000; // 4MB
+    // 必须保持较小：boot2 阶段内存紧张，4MB 静态 BSS 会挤掉 qlaunch 导致开机崩溃
+    // (2001-0132)。经实测，512KB(0x80000) 是 boot2 安全的上限。
+    // 超时界面所需的 ~1.9MB 帧缓冲已改为用 TransferMemory 在运行时分配
+    // (见 gui/screen_timeout.cpp)，不再占用该静态堆，因此无需扩容。
+    constexpr size_t INNER_HEAP_SIZE = 0x80000; // 512KB（boot2 安全）
     char nx_inner_heap[INNER_HEAP_SIZE];
     size_t nx_inner_heap_size = INNER_HEAP_SIZE;
 

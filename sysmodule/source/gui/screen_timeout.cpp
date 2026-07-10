@@ -29,6 +29,11 @@ namespace alefbet::pctrl::gui {
         constexpr size_t FrameBufferRequiredSizeHeapAligned = util::AlignUp(FrameBufferRequiredSizeBytes, os::MemoryHeapUnitSize);
 
         constinit u8 *g_framebuffer_pointer = nullptr;      
+
+        /* 帧缓冲改为用 TransferMemory 分配（系统 RAM，运行时按需分配），
+           不占用 512KB 的静态 inner heap，避免 boot2 阶段因堆过大导致 qlaunch 崩溃。 */
+        TransferMemory g_framebuffer_tmem;
+        bool g_framebuffer_tmem_created = false;
         
         bool sharedFontInitialized = false;
     }      
@@ -48,12 +53,23 @@ namespace alefbet::pctrl::gui {
     }
 
     void ScreenTimeout::InitializeFrameBufferPointer() {
-        void* mem = aligned_alloc(0x1000, FrameBufferRequiredSizePageAligned);
-        if(mem == nullptr) {
-            logError("[Screen timeout] Could not allocate %i bytes of memory\n", FrameBufferRequiredSizePageAligned);
+        /* 已分配则直接复用，避免重复创建 TransferMemory 泄漏句柄 */
+        if(g_framebuffer_pointer != nullptr) {
+            return;
         }
 
-        g_framebuffer_pointer = reinterpret_cast<u8*>(mem);
+        /* FIX: 之前用 aligned_alloc() 从 512KB 静态 inner heap 分配 ~1.9MB 帧缓冲，
+           必然失败（"Could not allocate 1966080 bytes of memory"）。改为用 TransferMemory
+           从系统 RAM 分配，运行时按需申请，不影响 boot2 阶段内存。 */
+        ::Result rc = tmemCreate(std::addressof(g_framebuffer_tmem), FrameBufferRequiredSizePageAligned, Perm_Rw);
+        if(R_FAILED(rc)) {
+            logError("[Screen timeout] Could not allocate %zu bytes of TransferMemory (rc=%i:%i)\n",
+                     FrameBufferRequiredSizePageAligned, R_MODULE(rc), R_DESCRIPTION(rc));
+            return;
+        }
+
+        g_framebuffer_tmem_created = true;
+        g_framebuffer_pointer = static_cast<u8*>(tmemGetAddr(std::addressof(g_framebuffer_tmem)));
     }
 
     /* Task implementations. */
