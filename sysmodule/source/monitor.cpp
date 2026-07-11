@@ -68,6 +68,25 @@ namespace alefbet::pctrl::srv {
             // Query the active application and user
             // and update the database
             pid = getRunningApplicationPid();
+
+            // —— 强制休息守卫（全局冷却）——
+            // 休息倒计时内，任何游戏一启动就被立即强制关闭；
+            // 倒计时结束且当日额度未耗尽后，恢复正常游玩（单次计时归零，可再次循环）。
+            if(inRest_) {
+                if(pid != 0) {
+                    logInfo("[Monitor] Still in forced rest, terminating launched application\n");
+                    terminateCurrentApplication();
+                }
+                if(--restRemainingMin_ <= 0) {
+                    inRest_ = false;
+                    sessionElapsedMin_ = 0;
+                    logInfo("[Monitor] Forced rest finished, play allowed again\n");
+                    NotificationsController::notifyRestOver();
+                }
+                svcSleepThread(MainLoopDelayInNanos.count());
+                continue; // 已 sleep，安全返回循环顶部
+            }
+
             u16 daily_limit = 0;            
             
             if(pid != 0) { 
@@ -110,7 +129,19 @@ namespace alefbet::pctrl::srv {
                             }
                         }
 
+                        // —— 新增：单次最长可玩时间累计 ——
+                        const auto sessionLimit = settings.contains(SETTING_SESSION_LIMIT)
+                            ? (u16)settings[SETTING_SESSION_LIMIT].int_value : 0u;
+                        const auto restMin = settings.contains(SETTING_REST_DURATION)
+                            ? (u16)settings[SETTING_REST_DURATION].int_value : 0u;
+
+                        if(sessionLimit > 0) {
+                            sessionElapsedMin_ += MainLoopDelayInMinutes.count(); // 每次循环 +1 分钟
+                            logDebug("[Monitor] Session elapsed %i/%i min for user %s\n", sessionElapsedMin_, sessionLimit, user.nickname.c_str());
+                        }
+
                         if(remainingTimeInMinutes <= 0) {
+                            // 每日额度耗尽 → 永久封锁（优先于单次休息）
                             logInfo("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
                             // v1.3.5: 不再渲染全屏超时界面。sysmodule 内存受限，1.9MB 帧缓冲
                             // 无法分配（aligned_alloc/tmemCreate 在 512KB 进程堆上失败；
@@ -119,6 +150,15 @@ namespace alefbet::pctrl::srv {
                             NotificationsController::notifyTimeExpired();
                             svcSleepThread(2'000'000'000); // 让提示先显示约 2 秒
                             terminateCurrentApplication();
+                        } else if(sessionLimit > 0 && sessionElapsedMin_ >= sessionLimit) {
+                            // 单次时长达到 → 终止并进入强制休息（当日仍有额度时才进入休息）
+                            logInfo("[Monitor] Session limit reached for user %s, forcing rest\n", user.nickname.c_str());
+                            NotificationsController::notifySessionExpired(restMin);
+                            svcSleepThread(2'000'000'000); // 让提示先显示约 2 秒
+                            terminateCurrentApplication();
+                            inRest_ = true;
+                            restRemainingMin_ = (restMin > 0) ? (int)restMin : 0; // 0=无冷却，直到当日额度耗尽才解封
+                            sessionElapsedMin_ = 0;
                         }
                     } else {
                         logDebug("[Monitor] No user found\n");
@@ -131,6 +171,7 @@ namespace alefbet::pctrl::srv {
                     logDebug("[Monitor] The game has been closed\n");
 
                     currentTitle_ = 0;
+                    sessionElapsedMin_ = 0; // 离开游戏即结束当前单次会话
                 }
             }
 

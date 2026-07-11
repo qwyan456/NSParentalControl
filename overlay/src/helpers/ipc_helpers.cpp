@@ -446,6 +446,86 @@ namespace alefbet::pctrl::ipc {
         return true;
     }
 
+    u16 getSessionLimit() {
+        logDebug("[IPC] Getting session limit\n");
+
+        if(!isAvailable()) {
+            logError("[IPC] service not available\n");
+            return 0;
+        }
+
+        u16 limit = 0;
+        auto& service = getAppContext().pctrl_service;
+        Result res = serviceDispatchOut(&service, (u32)Ipc::Command::GetSessionLimit, limit);
+
+        if(R_FAILED(res)) {
+            logError("[IPC] An error occured while getting the session limit.\n");
+        }
+
+        logDebug("[IPC] Session limit is %i\n", limit);
+
+        return limit;
+    }
+
+    bool setSessionLimit(u16 limit) {
+        logDebug("[IPC] Setting the session limit to %i\n", limit);
+
+        if(!isAvailable()) {
+            logError("[IPC] service not available\n");
+            return false;
+        }
+
+        auto& service = getAppContext().pctrl_service;
+        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetSessionLimit, limit);
+
+        if(R_FAILED(res)) {
+            logError("[IPC] An error occured while setting the session limit.\n");
+            return false;
+        }
+
+        return true;
+    }
+
+    u16 getRestDuration() {
+        logDebug("[IPC] Getting rest duration\n");
+
+        if(!isAvailable()) {
+            logError("[IPC] service not available\n");
+            return 0;
+        }
+
+        u16 dur = 0;
+        auto& service = getAppContext().pctrl_service;
+        Result res = serviceDispatchOut(&service, (u32)Ipc::Command::GetRestDuration, dur);
+
+        if(R_FAILED(res)) {
+            logError("[IPC] An error occured while getting the rest duration.\n");
+        }
+
+        logDebug("[IPC] Rest duration is %i\n", dur);
+
+        return dur;
+    }
+
+    bool setRestDuration(u16 dur) {
+        logDebug("[IPC] Setting the rest duration to %i\n", dur);
+
+        if(!isAvailable()) {
+            logError("[IPC] service not available\n");
+            return false;
+        }
+
+        auto& service = getAppContext().pctrl_service;
+        Result res = serviceDispatchIn(&service, (u32)Ipc::Command::SetRestDuration, dur);
+
+        if(R_FAILED(res)) {
+            logError("[IPC] An error occured while setting the rest duration.\n");
+            return false;
+        }
+
+        return true;
+    }
+
     bool isDebugLogEnabled() {
         logDebug("[IPC] Getting log level\n");
 

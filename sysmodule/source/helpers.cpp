@@ -595,6 +595,42 @@ namespace alefbet::pctrl::helpers {
         }
     }
 
+    u16 getSessionLimit() {
+        auto& settings = loadSettings();
+
+        if(settings.contains(SETTING_SESSION_LIMIT)) {
+            return (u16)settings[SETTING_SESSION_LIMIT].int_value;
+        }
+
+        return 0;
+    }
+
+    void setSessionLimit(u16 limit_in_minutes) {
+        saveSetting(Setting{
+            .key = SETTING_SESSION_LIMIT,
+            .type = INTEGER,
+            .int_value = limit_in_minutes
+        });
+    }
+
+    u16 getRestDuration() {
+        auto& settings = loadSettings();
+
+        if(settings.contains(SETTING_REST_DURATION)) {
+            return (u16)settings[SETTING_REST_DURATION].int_value;
+        }
+
+        return 0;
+    }
+
+    void setRestDuration(u16 duration_in_minutes) {
+        saveSetting(Setting{
+            .key = SETTING_REST_DURATION,
+            .type = INTEGER,
+            .int_value = duration_in_minutes
+        });
+    }
+
     std::string encodePassword(const std::vector<u64>& password) {
         std::string pin;
 

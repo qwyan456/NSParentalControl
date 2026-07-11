@@ -264,6 +264,40 @@ namespace alefbet::pctrl::srv {
         return Ipc::Result::Ok;
     }
 
+    Ipc::Result Service::setSessionLimit(Ipc::Request* request) {
+        u16 v = 0;
+        Ipc::Result rc = request->readRequestValue(v);
+        if(rc != Ipc::Result::Ok) {
+            logError("[Service] Could not read request data (session limit)\n");
+            return Ipc::Result::BadInput;
+        }
+
+        helpers::setSessionLimit(v);
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result Service::getSessionLimit(Ipc::Request* request) {
+        request->appendReplyValue(helpers::getSessionLimit());
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result Service::setRestDuration(Ipc::Request* request) {
+        u16 v = 0;
+        Ipc::Result rc = request->readRequestValue(v);
+        if(rc != Ipc::Result::Ok) {
+            logError("[Service] Could not read request data (rest duration)\n");
+            return Ipc::Result::BadInput;
+        }
+
+        helpers::setRestDuration(v);
+        return Ipc::Result::Ok;
+    }
+
+    Ipc::Result Service::getRestDuration(Ipc::Request* request) {
+        request->appendReplyValue(helpers::getRestDuration());
+        return Ipc::Result::Ok;
+    }
+
     Ipc::Result Service::setAdminPin(Ipc::Request* request) {
         //std::string pin;
         //Ipc::Result rc = request->readRequestData(pin);
@@ -552,6 +586,18 @@ namespace alefbet::pctrl::srv {
             }            
             case Ipc::Command::GetUserDailyLimit: {
                 return getUserDailyLimit(request);
+            }
+            case Ipc::Command::SetSessionLimit: {
+                return setSessionLimit(request);
+            }
+            case Ipc::Command::GetSessionLimit: {
+                return getSessionLimit(request);
+            }
+            case Ipc::Command::SetRestDuration: {
+                return setRestDuration(request);
+            }
+            case Ipc::Command::GetRestDuration: {
+                return getRestDuration(request);
             }
             case Ipc::Command::SetAdminPin: {                
                 return setAdminPin(request);

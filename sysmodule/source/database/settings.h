@@ -37,3 +37,5 @@ constexpr const char* SETTING_ENABLED = "enabled";
 constexpr const char* SETTING_LOGLEVEL = "log_level";
 constexpr const char* SETTING_BLACKLIST = "blacklist";
 constexpr const char* SETTING_AUTHENTICATION = "authentication";
+constexpr const char* SETTING_SESSION_LIMIT = "session_limit";   // 单次最长可玩（分钟），0=关闭
+constexpr const char* SETTING_REST_DURATION = "rest_duration";   // 强制休息（分钟），0=休息后直到当日额度耗尽才解封

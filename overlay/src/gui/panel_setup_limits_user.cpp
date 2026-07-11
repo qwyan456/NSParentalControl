@@ -38,6 +38,20 @@ tsl::elm::Element* SetupLimitsUserPanel::createUI() {
     dailyLimitHours_ = hoursPart.count();
     dailyLimitMinutes_ = minutesPart.count();
 
+    const auto& sessionLimitInMinutes = ipc::getSessionLimit();
+    const auto& sessionDuration = minutes{sessionLimitInMinutes};
+    auto sHours = duration_cast<hours>(sessionDuration);
+    auto sMinutes = duration_cast<minutes>(sessionDuration - sHours);
+    sessionLimitHours_ = sHours.count();
+    sessionLimitMinutes_ = sMinutes.count();
+
+    const auto& restDurationInMinutes = ipc::getRestDuration();
+    const auto& restDur = minutes{restDurationInMinutes};
+    auto rHours = duration_cast<hours>(restDur);
+    auto rMinutes = duration_cast<minutes>(restDur - rHours);
+    restDurationHours_ = rHours.count();
+    restDurationMinutes_ = rMinutes.count();
+
     rebuildUI();
 
     return rootFrame_;
@@ -54,28 +68,46 @@ void SetupLimitsUserPanel::rebuildUI() {
     // Daily Limit
     rootList_->addItem(new tsl::elm::CustomDrawer([this](tsl::gfx::Renderer* renderer, s32 x, s32 y, s32 w, s32 h) {
         s32 yPos = y;
-
         yPos += 35;
         renderer->drawString("Daily", false, x, yPos, 20, renderer->a(ColorWhite));
-        
-        // Minutes
         renderer->drawString("mn", false, w-40, yPos, 20, renderer->a(selectedItem_ == DailyLimitMinutes ? ColorSelected : ColorWhite));
         std::string str = std::to_string(dailyLimitMinutes_);
         renderer->drawString(str.c_str(), false, w-60 -(dailyLimitMinutes_ > 9 ? 10 : 0), yPos, 20, renderer->a(selectedItem_ == DailyLimitMinutes ? ColorSelected : ColorWhite));
-                
-        // Hours
         renderer->drawString("h", false, w-90, yPos, 20, renderer->a(selectedItem_ == DailyLimitHours ? ColorSelected : ColorWhite));
         str = std::to_string(dailyLimitHours_);
         renderer->drawString(str.c_str(), false, w-110 -(dailyLimitHours_ > 9 ? 10 : 0), yPos, 20, renderer->a(selectedItem_ == DailyLimitHours ? ColorSelected : ColorWhite));        
-        
     }), 60);
 
+    // Session Limit (per-session max playtime)
+    rootList_->addItem(new tsl::elm::CustomDrawer([this](tsl::gfx::Renderer* renderer, s32 x, s32 y, s32 w, s32 h) {
+        s32 yPos = y;
+        yPos += 35;
+        renderer->drawString("Session", false, x, yPos, 20, renderer->a(ColorWhite));
+        renderer->drawString("mn", false, w-40, yPos, 20, renderer->a(selectedItem_ == SessionLimitMinutes ? ColorSelected : ColorWhite));
+        std::string str = std::to_string(sessionLimitMinutes_);
+        renderer->drawString(str.c_str(), false, w-60 -(sessionLimitMinutes_ > 9 ? 10 : 0), yPos, 20, renderer->a(selectedItem_ == SessionLimitMinutes ? ColorSelected : ColorWhite));
+        renderer->drawString("h", false, w-90, yPos, 20, renderer->a(selectedItem_ == SessionLimitHours ? ColorSelected : ColorWhite));
+        str = std::to_string(sessionLimitHours_);
+        renderer->drawString(str.c_str(), false, w-110 -(sessionLimitHours_ > 9 ? 10 : 0), yPos, 20, renderer->a(selectedItem_ == SessionLimitHours ? ColorSelected : ColorWhite));        
+    }), 60);
+
+    // Rest Duration (forced rest after a session)
+    rootList_->addItem(new tsl::elm::CustomDrawer([this](tsl::gfx::Renderer* renderer, s32 x, s32 y, s32 w, s32 h) {
+        s32 yPos = y;
+        yPos += 35;
+        renderer->drawString("Rest", false, x, yPos, 20, renderer->a(ColorWhite));
+        renderer->drawString("mn", false, w-40, yPos, 20, renderer->a(selectedItem_ == RestDurationMinutes ? ColorSelected : ColorWhite));
+        std::string str = std::to_string(restDurationMinutes_);
+        renderer->drawString(str.c_str(), false, w-60 -(restDurationMinutes_ > 9 ? 10 : 0), yPos, 20, renderer->a(selectedItem_ == RestDurationMinutes ? ColorSelected : ColorWhite));
+        renderer->drawString("h", false, w-90, yPos, 20, renderer->a(selectedItem_ == RestDurationHours ? ColorSelected : ColorWhite));
+        str = std::to_string(restDurationHours_);
+        renderer->drawString(str.c_str(), false, w-110 -(restDurationHours_ > 9 ? 10 : 0), yPos, 20, renderer->a(selectedItem_ == RestDurationHours ? ColorSelected : ColorWhite));        
+    }), 60);
     
     rootFrame_->setContent(rootList_);
 }
 
 void SetupLimitsUserPanel::update() {    
-    
 }
 
 // Called once every frame to handle inputs not handled by other UI elements
@@ -88,8 +120,16 @@ bool SetupLimitsUserPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouc
 
         // Update the setting only when exitting
         u16 limitInMinutes = (u16)dailyLimitHours_*60 + (u16)dailyLimitMinutes_;
-        logDebug("limitInMinutes=%i, hours=%i, minutes=%i\n", limitInMinutes, dailyLimitHours_, dailyLimitMinutes_);
+        logDebug("daily limitInMinutes=%i, hours=%i, minutes=%i\n", limitInMinutes, dailyLimitHours_, dailyLimitMinutes_);
         ipc::setDailyLimit(user_, limitInMinutes);
+
+        u16 sessionInMinutes = (u16)sessionLimitHours_*60 + (u16)sessionLimitMinutes_;
+        logDebug("session limitInMinutes=%i, hours=%i, minutes=%i\n", sessionInMinutes, sessionLimitHours_, sessionLimitMinutes_);
+        ipc::setSessionLimit(sessionInMinutes);
+
+        u16 restInMinutes = (u16)restDurationHours_*60 + (u16)restDurationMinutes_;
+        logDebug("rest durationInMinutes=%i, hours=%i, minutes=%i\n", restInMinutes, restDurationHours_, restDurationMinutes_);
+        ipc::setRestDuration(restInMinutes);
 
         return true;
     } else if(keysDown & HidNpadButton_AnyDown) {
@@ -108,14 +148,22 @@ bool SetupLimitsUserPanel::handleInput(u64 keysDown, u64 keysHeld, const HidTouc
 void SetupLimitsUserPanel::selectNextItem() {
     switch(selectedItem_) {
         case DailyLimitHours: selectedItem_ = DailyLimitMinutes; break;
-        case DailyLimitMinutes: selectedItem_ = DailyLimitHours; break;
+        case DailyLimitMinutes: selectedItem_ = SessionLimitHours; break;
+        case SessionLimitHours: selectedItem_ = SessionLimitMinutes; break;
+        case SessionLimitMinutes: selectedItem_ = RestDurationHours; break;
+        case RestDurationHours: selectedItem_ = RestDurationMinutes; break;
+        case RestDurationMinutes: selectedItem_ = DailyLimitHours; break;
         default: break;
     }
 }
 
 void SetupLimitsUserPanel::selectBeforeItem() {
     switch(selectedItem_) {
-        case DailyLimitHours: selectedItem_ = DailyLimitMinutes; break;
+        case DailyLimitHours: selectedItem_ = RestDurationMinutes; break;
+        case RestDurationMinutes: selectedItem_ = RestDurationHours; break;
+        case RestDurationHours: selectedItem_ = SessionLimitMinutes; break;
+        case SessionLimitMinutes: selectedItem_ = SessionLimitHours; break;
+        case SessionLimitHours: selectedItem_ = DailyLimitMinutes; break;
         case DailyLimitMinutes: selectedItem_ = DailyLimitHours; break;
         default: break;
     }
@@ -125,6 +173,10 @@ void SetupLimitsUserPanel::decreaseValue() {
     switch(selectedItem_) {
         case DailyLimitHours: dailyLimitHours_ = valueRanged(dailyLimitHours_, -1, 0, 12); break;
         case DailyLimitMinutes: dailyLimitMinutes_ = valueRanged(dailyLimitMinutes_, -1, 0, 59); break;
+        case SessionLimitHours: sessionLimitHours_ = valueRanged(sessionLimitHours_, -1, 0, 12); break;
+        case SessionLimitMinutes: sessionLimitMinutes_ = valueRanged(sessionLimitMinutes_, -1, 0, 59); break;
+        case RestDurationHours: restDurationHours_ = valueRanged(restDurationHours_, -1, 0, 12); break;
+        case RestDurationMinutes: restDurationMinutes_ = valueRanged(restDurationMinutes_, -1, 0, 59); break;
         default: break;
     }
 }
@@ -133,6 +185,10 @@ void SetupLimitsUserPanel::increaseValue() {
     switch(selectedItem_) {
         case DailyLimitHours: dailyLimitHours_ = valueRanged(dailyLimitHours_, +1, 0, 12); break;
         case DailyLimitMinutes: dailyLimitMinutes_ = valueRanged(dailyLimitMinutes_, +1, 0, 59); break;
+        case SessionLimitHours: sessionLimitHours_ = valueRanged(sessionLimitHours_, +1, 0, 12); break;
+        case SessionLimitMinutes: sessionLimitMinutes_ = valueRanged(sessionLimitMinutes_, +1, 0, 59); break;
+        case RestDurationHours: restDurationHours_ = valueRanged(restDurationHours_, +1, 0, 12); break;
+        case RestDurationMinutes: restDurationMinutes_ = valueRanged(restDurationMinutes_, +1, 0, 59); break;
         default: break;
     }
 }

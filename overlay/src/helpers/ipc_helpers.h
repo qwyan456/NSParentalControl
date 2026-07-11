@@ -45,6 +45,11 @@ namespace alefbet::pctrl::ipc {
     u16 getDailyLimit(const UserData& user);
     bool setDailyLimit(const UserData& user, u16 limit);
 
+    u16 getSessionLimit();
+    bool setSessionLimit(u16 limit);
+    u16 getRestDuration();
+    bool setRestDuration(u16 duration);
+
     bool isDebugLogEnabled();
     bool enableDebugLog(bool enable);
 

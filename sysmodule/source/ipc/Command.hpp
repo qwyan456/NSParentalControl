@@ -31,7 +31,11 @@ namespace Ipc {
         RemoveTitleFromBlacklist,   /*! Removes a title from a users's blacklist */
         GetUserDailyLimit,          /*! Gets a users limits. */
         SetAuthenticationActive,    /*! Sets the authentication active or not */
-        IsAuthenticationActive      /*! Returns true if authentication is enabled */
+        IsAuthenticationActive,     /*! Returns true if authentication is enabled */
+        SetSessionLimit,            /*! Sets the per-session max playtime in minutes (global). */
+        GetSessionLimit,            /*! Gets the per-session max playtime in minutes (global). */
+        SetRestDuration,            /*! Sets the forced rest duration in minutes (global). */
+        GetRestDuration             /*! Gets the forced rest duration in minutes (global). */
     };
 
 
@@ -65,6 +69,10 @@ namespace Ipc {
             case Command::GetUserDailyLimit: return "GetUserDailyLimit";
             case Command::SetAuthenticationActive: return "SetAuthenticationActive";
             case Command::IsAuthenticationActive: return "IsAuthenticationActive";
+            case Command::SetSessionLimit: return "SetSessionLimit";
+            case Command::GetSessionLimit: return "GetSessionLimit";
+            case Command::SetRestDuration: return "SetRestDuration";
+            case Command::GetRestDuration: return "GetRestDuration";
             default: return "Unknown";
         }
     };

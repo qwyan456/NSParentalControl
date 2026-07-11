@@ -30,6 +30,9 @@ namespace alefbet::pctrl::srv {
             bool running_ = false;
             bool notified_ = false;
             u64 currentTitle_ = 0;
+            bool inRest_ = false;            // 是否处于强制休息冷却中
+            int sessionElapsedMin_ = 0;      // 当前连续单次会话已累计分钟数
+            int restRemainingMin_ = 0;       // 强制休息剩余分钟数（倒计时）
     };    
 
 };

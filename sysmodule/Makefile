@@ -42,7 +42,7 @@ BUILD		:=	build.nosync
 SOURCES		:=	source source/database source/ipc source/gui
 DATA		:=	data
 INCLUDES	:=	source source/database source/ipc source/gui
-APP_VERSION	:=	1.3.5
+APP_VERSION	:=	1.3.6
 
 #---------------------------------------------------------------------------------
 # options for code generation
