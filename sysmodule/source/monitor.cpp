@@ -76,6 +76,7 @@ namespace alefbet::pctrl::srv {
                 if(pid != 0) {
                     logInfo("[Monitor] Still in forced rest, terminating launched application\n");
                     terminateCurrentApplication();
+                    NotificationsController::notifyRestActive(restRemainingMin_); // 提示被关原因与剩余休息时长
                 }
                 if(--restRemainingMin_ <= 0) {
                     inRest_ = false;
@@ -148,13 +149,11 @@ namespace alefbet::pctrl::srv {
                             // svcSetHeapSize 在 AMS 1.10.3 下被内核拒绝 rc=1:101）。
                             // 改为：弹轻量系统提示 + 直接终止前台游戏，回到 HOME Menu，强制限玩。
                             NotificationsController::notifyTimeExpired();
-                            svcSleepThread(2'000'000'000); // 让提示先显示约 2 秒
                             terminateCurrentApplication();
-                        } else if(sessionLimit > 0 && sessionElapsedMin_ >= sessionLimit) {
+                        } else if(sessionLimit > 0 && sessionElapsedMin_ >= (int)sessionLimit) {
                             // 单次时长达到 → 终止并进入强制休息（当日仍有额度时才进入休息）
                             logInfo("[Monitor] Session limit reached for user %s, forcing rest\n", user.nickname.c_str());
                             NotificationsController::notifySessionExpired(restMin);
-                            svcSleepThread(2'000'000'000); // 让提示先显示约 2 秒
                             terminateCurrentApplication();
                             inRest_ = true;
                             restRemainingMin_ = (restMin > 0) ? (int)restMin : 0; // 0=无冷却，直到当日额度耗尽才解封
