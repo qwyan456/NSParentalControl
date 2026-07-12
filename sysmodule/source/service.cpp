@@ -69,7 +69,7 @@ namespace alefbet::pctrl::srv {
     void Service::showScreenTimeout() {        
         logDebug("[Service] Requested to show timeout screen\n");                        
 
-        gui_.showScreenTimeout();
+        gui_.showScreenTimeout("Timeout!", "Press Vol+ to reboot");
 
         // Wait for Vol+
         // Block unless a button has been pressed

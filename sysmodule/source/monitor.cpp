@@ -4,13 +4,16 @@
 #include "database/settings.h"
 #include "database/database.h"
 #include "notifications_controller.h"
+#include "gui/renderer.hpp"
 #include <chrono>
 #include <list>
+#include <string>
 //#include "pctrl_screen.hpp"
 
 using namespace alefbet::pctrl::logger;
 using namespace alefbet::pctrl::helpers;
 using namespace alefbet::pctrl::database;
+using namespace alefbet::pctrl::gfx;
 using namespace std::chrono_literals;
 
 constexpr std::chrono::minutes MainLoopDelayInMinutes = 1min;
@@ -76,12 +79,23 @@ namespace alefbet::pctrl::srv {
                 if(pid != 0) {
                     logInfo("[Monitor] Still in forced rest, terminating launched application\n");
                     terminateCurrentApplication();
-                    NotificationsController::notifyRestActive(restRemainingMin_); // 提示被关原因与剩余休息时长
+                }
+                // 全屏"强制休息"提示：已显示则刷新剩余时长；渲染失败则降级为 toast
+                if(guiActive_) {
+                    const auto restMin = settings.contains(SETTING_REST_DURATION)
+                        ? (u16)settings[SETTING_REST_DURATION].int_value : 0u;
+                    std::string sub = (restMin > 0)
+                        ? ("剩余 " + std::to_string(restRemainingMin_) + " 分钟，游戏已关闭")
+                        : "单次时长已达上限，游戏已关闭，稍后可继续";
+                    Renderer::get().drawNotice("强制休息", sub);
+                } else {
+                    NotificationsController::notifyRestActive(restRemainingMin_);
                 }
                 if(--restRemainingMin_ <= 0) {
                     inRest_ = false;
                     sessionElapsedMin_ = 0;
                     logInfo("[Monitor] Forced rest finished, play allowed again\n");
+                    if(guiActive_) { Renderer::get().hideNotice(); guiActive_ = false; }
                     NotificationsController::notifyRestOver();
                 }
                 svcSleepThread(MainLoopDelayInNanos.count());
@@ -144,16 +158,21 @@ namespace alefbet::pctrl::srv {
                         if(remainingTimeInMinutes <= 0) {
                             // 每日额度耗尽 → 永久封锁（优先于单次休息）
                             logInfo("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
-                            // v1.3.5: 不再渲染全屏超时界面。sysmodule 内存受限，1.9MB 帧缓冲
-                            // 无法分配（aligned_alloc/tmemCreate 在 512KB 进程堆上失败；
-                            // svcSetHeapSize 在 AMS 1.10.3 下被内核拒绝 rc=1:101）。
-                            // 改为：弹轻量系统提示 + 直接终止前台游戏，回到 HOME Menu，强制限玩。
-                            NotificationsController::notifyTimeExpired();
+                            // 全屏醒目提示盖住游戏；渲染失败则降级为系统 toast
+                            if(Renderer::get().drawNotice("时间到", "今日额度已用完，游戏已关闭")) {
+                                guiActive_ = true;
+                            } else {
+                                NotificationsController::notifyTimeExpired();
+                            }
                             terminateCurrentApplication();
                         } else if(sessionLimit > 0 && sessionElapsedMin_ >= (int)sessionLimit) {
                             // 单次时长达到 → 终止并进入强制休息（当日仍有额度时才进入休息）
                             logInfo("[Monitor] Session limit reached for user %s, forcing rest\n", user.nickname.c_str());
-                            NotificationsController::notifySessionExpired(restMin);
+                            if(Renderer::get().drawNotice("该休息了", "单次时长已达上限，游戏已关闭")) {
+                                guiActive_ = true;
+                            } else {
+                                NotificationsController::notifySessionExpired(restMin);
+                            }
                             terminateCurrentApplication();
                             inRest_ = true;
                             restRemainingMin_ = (restMin > 0) ? (int)restMin : 0; // 0=无冷却，直到当日额度耗尽才解封
@@ -183,6 +202,7 @@ namespace alefbet::pctrl::srv {
 
     void Monitor::stop() {
         logInfo("[Monitor] Stopping monitor\n");
+        if(guiActive_) { Renderer::get().hideNotice(); guiActive_ = false; }
         running_ = false;
         notified_ = false;
     }

@@ -1,40 +1,23 @@
+// stb_truetype 实现只在本编译单元生成一次（font.cpp 中对应宏已被注释），
+// 避免被多个包含 renderer.hpp 的 TU 重复定义。
+#define STB_TRUETYPE_IMPLEMENTATION
 #include "gui_controller.h"
 #include "logger.h"
 #include "gui/renderer.hpp"
 #include "utils.h"
-#include "screen_timeout.h"
+#include <string>
 
 using namespace alefbet::pctrl::logger;
 using namespace alefbet::pctrl::gfx;
-using namespace alefbet::pctrl::gui;
 
-void GuiController::showScreenTimeout() {
-    logDebug("[Gui] ShowScreenTimeout\n");
-
-    ScreenTimeout *screen = new ScreenTimeout();
-    //screen->setTransferMemory(g_nv_transfer_memory, sizeof(g_nv_transfer_memory));
-    screen->ShowScreenTimeout();
-
-    // Instance is not freed because the console will be rebooted
-
-    /*width_ = ScreenWidth;
-    height_ = ScreenHeight;
-
-    showOverlay(width_, height_, 0, 0);
-
-    auto& renderer = Renderer::get();
-    renderer.startFrame();
-
-    renderer.fillScreen(Color(0x44, 0x44, 0xff, 0x77));
-    renderer.drawString("Timeout!", false, 100, 100, 40, renderer.a(Color(0xff, 0xff, 0xff, 0xff)));
-    renderer.drawString("Press Vol+ to reboot", false, 100, 200, 30, renderer.a(Color(0xff, 0xff, 0xff, 0xff)));
-
-    renderer.endFrame();*/
+void GuiController::showScreenTimeout(const std::string& title, const std::string& subtitle) {
+    logDebug("[Gui] ShowScreenTimeout: %s / %s\n", title.c_str(), subtitle.c_str());
+    Renderer::get().drawNotice(title, subtitle);
 }
 
 void GuiController::hideScreenTimeout() {
     logDebug("[Gui] Hide timeout screen\n");
-    clearScreen();
+    Renderer::get().hideNotice();
 }
 
 /*void GuiController::showRemainingTimePanel() {    

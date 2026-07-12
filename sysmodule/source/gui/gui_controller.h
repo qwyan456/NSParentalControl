@@ -1,9 +1,10 @@
 #pragma once
 #include <switch.h>
+#include <string>
 
 class GuiController {
     public:
-        void showScreenTimeout();
+        void showScreenTimeout(const std::string& title, const std::string& subtitle);
         void hideScreenTimeout();
 
         // Disabled because of the conflict with Tesla... to be solved

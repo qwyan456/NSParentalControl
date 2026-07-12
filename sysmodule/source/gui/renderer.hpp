@@ -1,11 +1,11 @@
 #pragma once
 #include <switch.h>
-#define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 #include <algorithm>
 #include <switch/types.h>
 #include <unordered_map>
 #include <cwctype>
+#include <string>
 #include "utils.h"
 #include "logger.h"
 
@@ -70,13 +70,21 @@ namespace alefbet {
                         logDebug("__nx_vi_layer_id=%i\n", __nx_vi_layer_id);
                         logDebug("viCreateLayer %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = viSetLayerScalingMode(&this->m_layer, ViScalingMode_FitToLayer);
-                        
+
                         rc = viSetLayerZ(&this->m_layer, 99);
                         logDebug("viSetLayerZ %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
-                        
+
+                        // 全屏覆盖：把 vi 图层尺寸设为显示逻辑分辨率，帧缓冲(1280x720)经
+                        // FitToLayer 缩放填满整屏，从而盖住游戏/HOME 画面。
+                        s32 dispW = 0, dispH = 0;
+                        if (R_SUCCEEDED(viGetDisplayLogicalResolution(&this->m_display, &dispW, &dispH))) {
+                            LayerWidth  = (u16)dispW;
+                            LayerHeight = (u16)dispH;
+                            logDebug("[Renderer] Display logical resolution %ix%i\n", dispW, dispH);
+                        }
                         rc = viSetLayerSize(&this->m_layer, LayerWidth, LayerHeight);
                         logDebug("viSetLayerSize %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
-                        rc = viSetLayerPosition(&this->m_layer, LayerPosX, LayerPosY);
+                        rc = viSetLayerPosition(&this->m_layer, 0, 0);
                         logDebug("viSetLayerPosition %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = nwindowCreateFromLayer(&this->m_window, &this->m_layer);
                         logDebug("nwindowCreateFromLayer %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
@@ -472,6 +480,46 @@ namespace alefbet {
                         opacity = std::clamp(opacity, 0.0F, 1.0F);
 
                         Renderer::s_opacity = opacity;
+                    }
+
+                    /**
+                     * @brief 绘制一张全屏、醒目的提示（标题 + 副标题），覆盖当前游戏画面。
+                     *        非阻塞：图层会一直保持，直到调用 hideNotice()。
+                     * @param title    主标题（如 "时间到" / "强制休息"）
+                     * @param subtitle 副标题（补充说明 / 剩余时长）
+                     * @return true 表示提示已成功显示（vi 图层已建立）
+                     */
+                    bool drawNotice(const std::string& title, const std::string& subtitle) {
+                        if (!m_initialized) init(1280, 720, 0, 0);
+                        if (!m_initialized) return false; // 初始化失败（如堆不足），调用方应降级为 toast
+
+                        startFrame();
+                        // 不透明深色底，完全盖住游戏
+                        fillScreen(Color(0x00, 0x00, 0x00, 0xF));
+
+                        const float titleSize = 64.0f;
+                        auto t = drawString(title.c_str(), false, 0, 0, titleSize, Color(0xF, 0xF, 0xF, 0xF));
+                        s32 titleX = static_cast<s32>((FramebufferWidth - t.first) / 2);
+                        drawString(title.c_str(), false, titleX, static_cast<s32>(FramebufferHeight / 2) - static_cast<s32>(titleSize), titleSize, Color(0xF, 0xF, 0xF, 0xF));
+
+                        const float subSize = 30.0f;
+                        auto s = drawString(subtitle.c_str(), false, 0, 0, subSize, Color(0xB, 0xB, 0xB, 0xF));
+                        s32 subX = static_cast<s32>((FramebufferWidth - s.first) / 2);
+                        drawString(subtitle.c_str(), false, subX, static_cast<s32>(FramebufferHeight / 2) + 30, subSize, Color(0xB, 0xB, 0xB, 0xF));
+
+                        endFrame();
+                        return true;
+                    }
+
+                    /**
+                     * @brief 清除并销毁全屏提示图层，把帧缓冲内存归还给堆。
+                     */
+                    void hideNotice() {
+                        if (!m_initialized) return;
+                        startFrame();
+                        clearScreen();
+                        endFrame();
+                        this->exit();
                     }
 
                     /**
