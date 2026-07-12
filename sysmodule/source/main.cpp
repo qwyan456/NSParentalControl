@@ -18,14 +18,10 @@ using namespace alefbet::pctrl::database;
 extern "C" {
 #endif
 
-    // FIX: 静态 inner heap（sys-clk/nx-ovlloader 标准模式）
-    // 必须保持较小：boot2 阶段内存紧张，4MB 静态 BSS 会挤掉 qlaunch 导致开机崩溃
-    // (2001-0132)。经实测，512KB(0x80000) 是 boot2 安全的上限。
-    // 超时界面所需的 ~1.9MB 帧缓冲已改为用 TransferMemory 在运行时分配
-    // (见 gui/screen_timeout.cpp)，不再占用该静态堆，因此无需扩容。
-    constexpr size_t INNER_HEAP_SIZE = 0x80000; // 512KB（boot2 安全）
-    char nx_inner_heap[INNER_HEAP_SIZE];
-    size_t nx_inner_heap_size = INNER_HEAP_SIZE;
+    // 动态堆（参考可运营 sysmodule 标准做法）：boot2 阶段用 svcSetHeapSize
+    // 在运行时扩展堆，不占用静态 BSS（4MB 静态 BSS 会挤掉 qlaunch 导致 2001-0132 开机崩溃）。
+    // 2.5MB 足以容纳超时全屏提示所需的 ~1.9MB 帧缓冲（RGBA_4444）。
+    constexpr size_t TotalHeapSize = ams::util::AlignUp(2500_KB, ams::os::MemoryHeapUnitSize);
 
     constexpr size_t ThreadServiceStackRequiredSizeBytes = ams::util::AlignUp(256_KB, 128);
     constexpr size_t ThreadServiceStackRequiredSizeAligned = ams::util::AlignUp(ThreadServiceStackRequiredSizeBytes, ams::os::MemoryPageSize);
@@ -58,16 +54,17 @@ extern "C" {
         return rc;
     }
 
-    // FIX: 使用静态 inner heap，不再调用 svcSetHeapSize
-    // sys-clk 和 nx-ovlloader 都使用这种方式
+    // FIX: 动态堆（参考可运营 sysmodule）：boot2 安全，且为全屏帧缓冲留出空间
     void __libnx_initheap(void)
     {
-        void* addr = nx_inner_heap;
-        size_t size = nx_inner_heap_size;
         extern char* fake_heap_start;
         extern char* fake_heap_end;
-        fake_heap_start = (char*)addr;
-        fake_heap_end   = (char*)addr + size;
+        void* addr = nullptr;
+        Result rc = svcSetHeapSize(&addr, TotalHeapSize);
+        if(R_SUCCEEDED(rc)) {
+            fake_heap_start = (char*)addr;
+            fake_heap_end   = fake_heap_start + TotalHeapSize;
+        }
     }
 
     // FIX: __appInit 严格遵循 sys-clk 模式 — 只做 sm + setsys
@@ -163,19 +160,8 @@ int main(int argc, char **argv)
 
     logInfo("[Main] Parental control starting\n");
 
-    // FIX: 初始化 pmdmnt 并等待 qlaunch 就绪（sys-clk 标准模式）
-    pmdmntInitialize();
-    
-    logInfo("[Main] Waiting for qlaunch to be ready\n");
-    alefbet::pctrl::waitForQLaunch();
-
-    // 额外等待 2 秒让 HOME Menu 完全初始化
-    svcSleepThread(2'000'000'000LL);
-
-    // 初始化 ns 服务
-    nsInitialize();
-
-    // 现在注册 IPC 服务并启动 Monitor
+    // FIX: 立即注册 IPC 服务（参考可运营 sysmodule）——服务在开机瞬间即可用，
+    // 避免此前等待 qlaunch/ns 的 32 秒空窗期内 Overlay 误报 “not installed”。
     Ipc::Server* ipcServer = new Ipc::Server("pctrl");
     alefbet::pctrl::srv::Service* service = new alefbet::pctrl::srv::Service(ipcServer);    
 
@@ -190,7 +176,19 @@ int main(int argc, char **argv)
         logError("Could not start the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
         return 3;
     }
-        
+
+    // 服务已注册，下面再准备 Monitor 所需的 pmdmnt/ns/qlaunch（仅影响监控逻辑，不影响服务可用性）
+    pmdmntInitialize();
+    
+    logInfo("[Main] Waiting for qlaunch to be ready\n");
+    alefbet::pctrl::waitForQLaunch();
+
+    // 额外等待 2 秒让 HOME Menu 完全初始化
+    svcSleepThread(2'000'000'000LL);
+
+    // 初始化 ns 服务
+    nsInitialize();
+
     Thread threadMonitor;
     alefbet::pctrl::srv::Monitor* monitor = new alefbet::pctrl::srv::Monitor();
     void* monitorArgs[2] { monitor, service };
@@ -207,7 +205,7 @@ int main(int argc, char **argv)
 
     // Start monitoring
     monitor->start(); 
-
+    
     rc = threadWaitForExit(&threadIpc);
     if(R_FAILED(rc)) {
         logError("Could not wait for the service thread to end, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
