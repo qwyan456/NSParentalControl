@@ -158,22 +158,25 @@ namespace alefbet::pctrl::srv {
                         if(remainingTimeInMinutes <= 0) {
                             // 每日额度耗尽 → 永久封锁（优先于单次休息）
                             logInfo("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
+                            // FIX: 先终止游戏，再尝试全屏提示。避免提示渲染（vi 帧缓冲）失败时
+                            // 抛异常/崩溃导致 terminateCurrentApplication() 不被执行、游戏未被限制。
+                            terminateCurrentApplication();
                             // 全屏醒目提示盖住游戏；渲染失败则降级为系统 toast
                             if(Renderer::get().drawNotice("时间到", "今日额度已用完，游戏已关闭")) {
                                 guiActive_ = true;
                             } else {
                                 NotificationsController::notifyTimeExpired();
                             }
-                            terminateCurrentApplication();
                         } else if(sessionLimit > 0 && sessionElapsedMin_ >= (int)sessionLimit) {
                             // 单次时长达到 → 终止并进入强制休息（当日仍有额度时才进入休息）
                             logInfo("[Monitor] Session limit reached for user %s, forcing rest\n", user.nickname.c_str());
+                            // FIX: 同样先终止，再提示（渲染失败也不影响限制）
+                            terminateCurrentApplication();
                             if(Renderer::get().drawNotice("该休息了", "单次时长已达上限，游戏已关闭")) {
                                 guiActive_ = true;
                             } else {
                                 NotificationsController::notifySessionExpired(restMin);
                             }
-                            terminateCurrentApplication();
                             inRest_ = true;
                             restRemainingMin_ = (restMin > 0) ? (int)restMin : 0; // 0=无冷却，直到当日额度耗尽才解封
                             sessionElapsedMin_ = 0;

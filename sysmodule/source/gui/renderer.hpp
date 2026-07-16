@@ -90,6 +90,18 @@ namespace alefbet {
                         logDebug("nwindowCreateFromLayer %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
                         rc = framebufferCreate(&this->m_framebuffer, &this->m_window, FramebufferWidth, FramebufferHeight, PIXEL_FORMAT_RGBA_4444, 2);
                         logDebug("framebufferCreate %i:%i\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                        if (R_FAILED(rc)) {
+                            // FIX: 帧缓冲分配失败（内存不足，常见于未配置 system_resource_size 的 boot2 进程）
+                            // 绝不能继续——否则 m_currentFramebuffer 为 NULL，drawNotice 写空指针会崩掉监控线程。
+                            // 这里安全退出初始化，保持 m_initialized=false，让 drawNotice 返回 false、调用方降级为 toast。
+                            logError("[Renderer] framebufferCreate 失败(rc=%i:%i)，放弃全屏提示，降级为 toast\n", R_MODULE(rc), R_DESCRIPTION(rc));
+                            nwindowClose(&this->m_window);
+                            viCloseLayer(&this->m_layer);
+                            viCloseDisplay(&this->m_display);
+                            eventClose(&this->m_vsyncEvent);
+                            viExit();
+                            return;
+                        }
                         rc = setInitialize();
                         rc = initFonts();
                         setExit();
