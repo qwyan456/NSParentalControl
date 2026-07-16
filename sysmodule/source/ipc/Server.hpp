@@ -37,6 +37,10 @@ namespace Ipc {
             // Set the request handler function
             void setRequestHandler(Handler);
 
+            // 服务是否就绪（注册成功且未处于致命错误态）
+            // 用于调用方在 sm 瞬时不可用时重试注册（解决 boot2 开机瞬间注册失败导致的永久 not installed）
+            bool isReady() const;
+
             // Process any received requests (returns false once a fatal error occurs)
             bool process();
 

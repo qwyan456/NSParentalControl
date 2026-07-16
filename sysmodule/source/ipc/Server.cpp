@@ -130,6 +130,11 @@ namespace Ipc {
         this->handler = f;
     }
 
+    bool Server::isReady() const {
+        // handles 非空表示 smRegisterService 成功；error_ 为 fatal 标志
+        return !this->error_ && !this->handles.empty();
+    }
+
     bool Server::process() {
         if (this->error_) {
             return false;

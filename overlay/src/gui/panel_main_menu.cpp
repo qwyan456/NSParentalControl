@@ -11,6 +11,7 @@
 #include "panel_history_main.h"
 #include "AppContext.h"
 #include "helpers/ipc_helpers.h"
+#include "../main.h"
 
 using namespace alefbet::pctrl;
 using namespace alefbet::pctrl::logger;
@@ -164,7 +165,29 @@ void MainMenuPanel::rebuildUI() {
     rootFrame_->setContent(rootList_);
 }
 
-void MainMenuPanel::update() {    
+void MainMenuPanel::update() {
+    // 服务可用性自愈：
+    // sysmodule 会在 qlaunch 就绪后才注册 pctrl 服务（开机后约 30+ 秒），
+    // 若 Overlay 在注册前打开，启动时的单次探测会缓存 is_available=false 并永久显示 “not installed”。
+    // 这里周期性重探测（每 2 秒），一旦服务上线即翻转 is_available 并重绘界面与副标题，
+    // 使所有受 is_available 门控的 IPC 功能立即恢复。
+    static auto lastProbe = std::chrono::steady_clock::now() - std::chrono::seconds(10);
+    if (!getAppContext().is_available) {
+        auto now = std::chrono::steady_clock::now();
+        if (now - lastProbe >= std::chrono::seconds(2)) {
+            lastProbe = now;
+            if (connectToService()) {
+                logInfo("[MainMenu] pctrl 服务已连接，刷新界面\n");
+                if (rootFrame_ != nullptr && rootList_ != nullptr) {
+                    rootList_->clear();
+                    rebuildUI();
+                    rootFrame_->setSubtitle(
+                        isParentalControlEnabled() ? "Parental Control is Enabled"
+                                                   : "Parental Control is Disabled");
+                }
+            }
+        }
+    }
 }
 
 // Called once every frame to handle inputs not handled by other UI elements

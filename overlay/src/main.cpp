@@ -12,6 +12,7 @@
 #include "logger.h"
 #include "helpers/ipc_helpers.h"
 #include "AppContext.h"
+#include "main.h"
 
 //Examples : https://github.com/masagrator/Status-Monitor-Overlay/blob/master/source/main.cpp
 

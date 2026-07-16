@@ -163,26 +163,9 @@ int main(int argc, char **argv)
 
     logInfo("[Main] Parental control starting\n");
 
-    // FIX: 立即注册 IPC 服务（参考可运营 sysmodule）——服务在开机瞬间即可用，
-    // 避免此前等待 qlaunch/ns 的 32 秒空窗期内 Overlay 误报 “not installed”。
-    Ipc::Server* ipcServer = new Ipc::Server("pctrl");
-    alefbet::pctrl::srv::Service* service = new alefbet::pctrl::srv::Service(ipcServer);    
-
-    Thread threadIpc;
-    rc = threadCreate(&threadIpc, alefbet::pctrl::startIpc, service, g_thread_service_memory, ThreadServiceStackRequiredSizeAligned, 0x2c, -2);               
-    if(R_FAILED(rc)) {
-        logError("Could not create the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
-        return 2;
-    }
-    rc = threadStart(&threadIpc);
-    if(R_FAILED(rc)) {
-        logError("Could not start the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
-        return 3;
-    }
-
-    // 服务已注册，下面再准备 Monitor 所需的 pmdmnt/ns/qlaunch（仅影响监控逻辑，不影响服务可用性）
+    // 先准备 Monitor 所需的 pmdmnt/ns/qlaunch（仅影响监控逻辑，不影响服务可用性）
     pmdmntInitialize();
-    
+
     logInfo("[Main] Waiting for qlaunch to be ready\n");
     alefbet::pctrl::waitForQLaunch();
 
@@ -191,6 +174,40 @@ int main(int argc, char **argv)
 
     // 初始化 ns 服务
     nsInitialize();
+
+    // 注册 IPC 服务：必须在 qlaunch 就绪之后注册。
+    // 注意：boot2 开机瞬间 sm 尚未就绪，过早调用 smRegisterService 会被内核拒绝，
+    // 导致服务永远注册不上、Overlay 永久显示 “not installed”（v1.3.9 的坑）。
+    // 这里改为 qlaunch 就绪后注册，并加重试循环应对 sm 瞬时不可用（最多 ~60s）。
+    Ipc::Server* ipcServer = nullptr;
+    for (int attempt = 1; attempt <= 120; attempt++) {
+        ipcServer = new Ipc::Server("pctrl");
+        if (ipcServer != nullptr && ipcServer->isReady()) {
+            logInfo("[Main] pctrl 服务注册成功（第 %d 次尝试）\n", attempt);
+            break;
+        }
+        delete ipcServer;
+        ipcServer = nullptr;
+        svcSleepThread(500'000'000); // 500ms
+    }
+    if (ipcServer == nullptr) {
+        logError("[Main] 120 次重试后仍无法注册 pctrl 服务，退出\n");
+        return 2;
+    }
+
+    alefbet::pctrl::srv::Service* service = new alefbet::pctrl::srv::Service(ipcServer);
+
+    Thread threadIpc;
+    rc = threadCreate(&threadIpc, alefbet::pctrl::startIpc, service, g_thread_service_memory, ThreadServiceStackRequiredSizeAligned, 0x2c, -2);
+    if(R_FAILED(rc)) {
+        logError("Could not create the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
+        return 3;
+    }
+    rc = threadStart(&threadIpc);
+    if(R_FAILED(rc)) {
+        logError("Could not start the service thread, error %i:%i.\n", R_MODULE(rc), R_DESCRIPTION(rc));
+        return 4;
+    }
 
     Thread threadMonitor;
     alefbet::pctrl::srv::Monitor* monitor = new alefbet::pctrl::srv::Monitor();
