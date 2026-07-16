@@ -13,6 +13,24 @@ using namespace alefbet::pctrl::helpers;
 using namespace alefbet::pctrl::database;
 using namespace std::chrono_literals;
 
+namespace {
+    // 当前墙钟时间（纳秒，TimeType_LocalSystemClock）。
+    // 用 RTC 真实时间，系统灭屏睡眠时也前进——这是修复休息倒计时 bug 的关键。
+    u64 nowNs() {
+        static bool timeReady = false;
+        if(!timeReady) {
+            ::Result irc = timeInitialize();
+            if(R_SUCCEEDED(irc)) timeReady = true;
+        }
+        u64 ts = 0;
+        ::Result rc = timeGetCurrentTime(TimeType_LocalSystemClock, &ts);
+        if(R_FAILED(rc)) {
+            logError("[Monitor] nowNs: timeGetCurrentTime 失败 (%i:%i)\n", R_MODULE(rc), R_DESCRIPTION(rc));
+        }
+        return ts;
+    }
+}
+
 constexpr std::chrono::minutes MainLoopDelayInMinutes = 1min;
 constexpr std::chrono::nanoseconds MainLoopDelayInNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(MainLoopDelayInMinutes); 
 
@@ -76,9 +94,19 @@ namespace alefbet::pctrl::srv {
                 if(pid != 0) {
                     logInfo("[Monitor] Still in forced rest, terminating launched application\n");
                     terminateCurrentApplication();
-                    NotificationsController::notifyRestActive(restRemainingMin_); // 提示被关原因与剩余休息时长
                 }
-                if(--restRemainingMin_ <= 0) {
+                // FIX(坑5): 用绝对墙钟结束时间判断，而非“每循环 -1 分钟”计数器。
+                // 系统灭屏睡眠时监控线程被挂起，循环不跑，旧计数器冻结 → 真实时间已超设定休息时长，
+                // 亮屏后打开游戏仍被判“休息未到”反复关闭。restEndTs_ 基于 RTC 墙钟（睡眠也前进）。
+                const u64 now = nowNs();
+                int remainingMin = 0;
+                if(now < restEndTs_) {
+                    const u64 remainNs = restEndTs_ - now;
+                    remainingMin = (int)((remainNs + 59999999999ULL) / 60000000000ULL); // 向上取整到分钟
+                    if(remainingMin < 1) remainingMin = 1;
+                }
+                NotificationsController::notifyRestActive(remainingMin); // 提示被关原因与剩余休息时长
+                if(now >= restEndTs_) {
                     inRest_ = false;
                     sessionElapsedMin_ = 0;
                     logInfo("[Monitor] Forced rest finished, play allowed again\n");
@@ -156,7 +184,11 @@ namespace alefbet::pctrl::srv {
                             NotificationsController::notifySessionExpired(restMin);
                             terminateCurrentApplication();
                             inRest_ = true;
-                            restRemainingMin_ = (restMin > 0) ? (int)restMin : 0; // 0=无冷却，直到当日额度耗尽才解封
+                            // FIX(坑5): 用绝对墙钟结束时间，而非“每循环 -1 分钟”计数器。
+                            // 系统灭屏睡眠时监控线程被挂起，计数器冻结，真实时间已超设定休息时长，
+                            // 亮屏后打开游戏仍被判“休息未到”反复关闭。restEndTs_ 基于 RTC 墙钟（睡眠也前进），
+                            // 亮屏后 nowNs() >= restEndTs_ 即判定休息结束。
+                            restEndTs_ = nowNs() + (u64)restMin * 60ULL * 1000000000ULL;
                             sessionElapsedMin_ = 0;
                         }
                     } else {
