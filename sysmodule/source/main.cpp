@@ -18,10 +18,13 @@ using namespace alefbet::pctrl::database;
 extern "C" {
 #endif
 
-    // 动态堆（参考可运营 sysmodule 标准做法）：boot2 阶段用 svcSetHeapSize
-    // 在运行时扩展堆，不占用静态 BSS（4MB 静态 BSS 会挤掉 qlaunch 导致 2001-0132 开机崩溃）。
-    // 2.5MB 足以容纳超时全屏提示所需的 ~1.9MB 帧缓冲（RGBA_4444）。
-    constexpr size_t TotalHeapSize = ams::util::AlignUp(2500_KB, ams::os::MemoryHeapUnitSize);
+    // 静态 inner heap（sys-clk/nx-ovlloader 标准模式，已实测可在 boot2 启动）
+    // 必须保持较小：boot2 阶段内存紧张，过大的静态 BSS 会挤掉 qlaunch 导致 2001-0132 开机崩溃。
+    // 经实测 512KB(0x80000) 是 boot2 安全上限；全屏帧缓冲改用 TransferMemory 运行时分配，不占此堆。
+    // 注意：svcSetHeapSize 在 boot2 进程（无预留堆区）会被内核拒绝(rc=1:101)，切勿再用动态堆。
+    constexpr size_t INNER_HEAP_SIZE = 0x80000; // 512KB（boot2 安全）
+    char nx_inner_heap[INNER_HEAP_SIZE];
+    size_t nx_inner_heap_size = INNER_HEAP_SIZE;
 
     constexpr size_t ThreadServiceStackRequiredSizeBytes = ams::util::AlignUp(256_KB, 128);
     constexpr size_t ThreadServiceStackRequiredSizeAligned = ams::util::AlignUp(ThreadServiceStackRequiredSizeBytes, ams::os::MemoryPageSize);
@@ -54,17 +57,17 @@ extern "C" {
         return rc;
     }
 
-    // FIX: 动态堆（参考可运营 sysmodule）：boot2 安全，且为全屏帧缓冲留出空间
+    // FIX: 使用静态 inner heap（sys-clk / nx-ovlloader 标准做法），绝不调用 svcSetHeapSize
+    // —— boot2 进程无预留堆区，svcSetHeapSize 会被内核拒绝(rc=1:101)，导致堆大小为 0、
+    //    new 抛 std::bad_alloc 进而 std::terminate 致开机崩溃（v1.3.5 / v1.3.9 的坑）。
     void __libnx_initheap(void)
     {
+        void* addr = nx_inner_heap;
+        size_t size = nx_inner_heap_size;
         extern char* fake_heap_start;
         extern char* fake_heap_end;
-        void* addr = nullptr;
-        Result rc = svcSetHeapSize(&addr, TotalHeapSize);
-        if(R_SUCCEEDED(rc)) {
-            fake_heap_start = (char*)addr;
-            fake_heap_end   = fake_heap_start + TotalHeapSize;
-        }
+        fake_heap_start = (char*)addr;
+        fake_heap_end   = (char*)addr + size;
     }
 
     // FIX: __appInit 严格遵循 sys-clk 模式 — 只做 sm + setsys
