@@ -19,18 +19,25 @@ namespace {
     //   1) 系统灭屏睡眠时也持续前进（RTC/常驻时钟不随进程挂起而停止）；
     //   2) 不依赖 time 服务，避免 sleep/wake 后 timeGetCurrentTime 偶发返回 0 / 冻结，
     //      导致 `now < restEndTs_` 永远成立、休息倒计时卡在 30 分钟无法结束（坑5 二次修复）。
-    // Tegra X1/X2 节拍频率为 19.2MHz：ns = ticks * 1e9 / 19_200_000。
+    // Tegra X1/X2 节拍频率为 19.2MHz。
+    // ⚠️ 坑10(P0)：直接 `ticks * 1'000'000'000 / 19'200'000` 会在开机约 16 分钟时
+    //   因 `ticks * 1e9` 超过 u64 最大值(2^64≈1.84e19)而整数溢出回绕 → `now` 突然变小 →
+    //   固定值 restEndTs_ 不变，remaining 被撑大（设 5 分钟却显示 9 分钟），且休息被无限拉长。
+    //   上述 nowNs() 已改为「先除后乘 + 余数补偿」避免溢出。
     u64 nowNs() {
         const u64 ticks = armGetSystemTick();
-        return (ticks * 1000000000ULL) / 19200000ULL;
+        constexpr u64 freq = 19200000ULL;
+        const u64 sec  = ticks / freq;
+        const u64 frac = ticks % freq;
+        return sec * 1000000000ULL + (frac * 1000000000ULL) / freq;
     }
 }
 
 constexpr std::chrono::minutes MainLoopDelayInMinutes = 1min;
 constexpr std::chrono::nanoseconds MainLoopDelayInNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(MainLoopDelayInMinutes); 
-// 休息守卫内的轮询间隔更短：让“休息中”提示更频繁出现（避免亮屏瞬间错过 2.5s 弹窗），
-// 同时让休息到点后更快解封（原 1 分钟粒度太粗）。
-constexpr std::chrono::seconds RestLoopDelayInSeconds = 15s;
+// 休息守卫内的轮询间隔：让“休息中”提示稳定出现（避免亮屏瞬间错过 2.5s 弹窗），
+// 同时让休息到点后尽快解封（原 1 分钟粒度太粗）。30s 比 15s 更省电、弹窗也不至于太频繁。
+constexpr std::chrono::seconds RestLoopDelayInSeconds = 30s;
 constexpr std::chrono::nanoseconds RestLoopDelayInNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(RestLoopDelayInSeconds);
 
 namespace alefbet::pctrl::srv {   
@@ -113,7 +120,7 @@ namespace alefbet::pctrl::srv {
                     logInfo("[Monitor] Forced rest finished, play allowed again\n");
                     NotificationsController::notifyRestOver();
                 }
-                svcSleepThread(RestLoopDelayInNanos.count()); // 休息守卫内 15s 轮询：提示更频繁、到点更快解封
+                svcSleepThread(RestLoopDelayInNanos.count()); // 休息守卫内 30s 轮询：提示稳定、到点更快解封
                 continue; // 已 sleep，安全返回循环顶部
             }
 

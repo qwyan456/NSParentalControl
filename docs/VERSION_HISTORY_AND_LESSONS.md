@@ -119,6 +119,22 @@
   - `Break over - you can play now.` → `Break over! Play now.`
   - 文本在弹窗内**居中绘制**，超出部分 scissor 裁掉**两端**（不单末尾），故临界文案也一并缩短留余量。
 
+### ❌ 坑 10（P0）：休息计时 `nowNs()` 纳秒换算 u64 溢出 → 剩余时间撑大 / 休息无限拉长（v1.3.11）
+- **现象**：设 `rest_duration=5` 分钟，却提示「rest 剩余 9 分钟」；且休息被拖成十几分钟才解封。
+- **日志特征**：`now` 在某次读取突然从几百秒倒退到十几秒（如 `435,541,724,791` → `23,745,264,055`），而 `restEndTs_` 是固定值 → `remaining = restEndTs_ - now` 被撑大。
+- **根因**：`nowNs()` 用 `return (ticks * 1000000000ULL) / 19200000ULL;`。`cntpct_el0`(19.2MHz) 开机约 **16 分钟**时 `ticks≈1.84e10`，`ticks*1e9≈1.84e19` 超过 `u64` 最大值 `2^64≈1.84e19` → **乘法溢出回绕**，`now` 变小。此后 `now` 要再爬回 `restEndTs_` 才解封，实际休息被大幅拉长。任何「开机>16 分钟时进入休息」都触发——Switch 几乎常开，故为**必现 P0**。
+- **澄清**：`armGetSystemTick()` 读 `cntpct_el0` 物理计数器，本身单调递增、睡眠也前进（v1.3.8 选它是对的），**硬件无问题**，纯属软件整数溢出。
+- **正确做法（v1.3.11）**：「先除后乘 + 余数补偿」避免溢出：
+  ```cpp
+  const u64 ticks = armGetSystemTick();
+  constexpr u64 freq = 19200000ULL;
+  const u64 sec  = ticks / freq;
+  const u64 frac = ticks % freq;
+  return sec * 1000000000ULL + (frac * 1000000000ULL) / freq;
+  ```
+  独立程序验证：旧公式 961s(16min) 溢出，新公式 60s~1 年全部正确且跨回绕点单调。
+- 附带：休息守卫轮询 15s → 30s（用户要求，更省电、弹窗不频繁）。
+
 ### ❌ 坑 8：`timeInitialize()` 每次调用不退出 → time 服务 session 耗尽
 - **现象**：`today()` 返回空串，统计静默停止（进程不崩）。
 - **根因**：每次调用 `today()` 都 `timeInitialize()` 而不 `timeExit()`，session 耗尽后 `timeInitialize()` 失败。
@@ -128,7 +144,8 @@
 
 ## 三、当前状态（基于 1.3.7 新分支 `fix/rest-time`）
 1. ✅ **休息时间计算 bug（坑 5 及二次修复）已修**：先改为绝对墙钟结束时间，再因 `time` 服务在睡眠/唤醒后偶发失败，改为 ARM 系统节拍计数器（`armGetSystemTick`）。已发布 `restfix-v1.3.8`。
-2. ✅ **UltraHand 通知修复（坑 9 + 续）**：v1.3.9 修“偶发不显示 + 休息提示裁切 + .notify 堆积”；v1.3.10 全量审计其余 toast，把 3 条（临界 1 条）超长文案缩短防裁切。最新 Release = `restfix-v1.3.10`。
+2. ✅ **UltraHand 通知修复（坑 9 + 续）**：v1.3.9 修“偶发不显示 + 休息提示裁切 + .notify 堆积”；v1.3.10 全量审计其余 toast，把 3 条（临界 1 条）超长文案缩短防裁切。
+3. ✅ **休息计时溢出修复（坑 10, P0）**：v1.3.11 修 `nowNs()` 的 u64 溢出（开机>16 分钟进入休息会撑大剩余时间、拉长休息），并休息轮询 15s→30s。最新 Release = `restfix-v1.3.11`。
 3. ⏸️ `main` 保持 v1.3.7（干净回退基线）；`archive/attempts-v1.3.8-v1.3.12` 保留有问题的尝试线，供复盘。
 4. not installed：1.3.7 在用户硬件上“服务可用但晚注册”，若仍要彻底消除，需把 v1.3.12 的 Overlay 重探测逻辑移植回来（坑 2 + 坑 6）。
 5. 部署前确认 sysmodule 真的在跑（坑 7），否则一切限玩逻辑无效。

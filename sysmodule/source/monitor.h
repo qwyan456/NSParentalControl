@@ -32,9 +32,9 @@ namespace alefbet::pctrl::srv {
             u64 currentTitle_ = 0;
             bool inRest_ = false;            // 是否处于强制休息冷却中
             int sessionElapsedMin_ = 0;      // 当前连续单次会话已累计分钟数
-            u64 restEndTs_ = 0;              // 强制休息结束的绝对墙钟时间(纳秒, TimeType_LocalSystemClock)
-                                            // 用 RTC 真实时间，系统灭屏睡眠也前进；
-                                            // 旧的“每循环 -1 分钟”计数器会因睡眠冻结而算错。
+            u64 restEndTs_ = 0;              // 强制休息结束的绝对时间(纳秒, 基于 ARM 系统节拍计数器 cntpct_el0)
+                                            // 该计数器睡眠也前进、不依赖 time 服务；
+                                            // nowNs() 已做溢出防护(坑10)，可安全用于绝对结束时间比较。
     };    
 
 };
