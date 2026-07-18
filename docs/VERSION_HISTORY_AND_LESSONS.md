@@ -47,7 +47,7 @@
 ### ❌ 坑 4：`monitor` 先画提示再终止游戏 → 渲染失败阻断限制
 - **正确做法**：**永远先 `terminateCurrentApplication()`，再 `drawNotice()`**。`framebufferCreate` 失败时在 `Renderer` 里安全降级为系统 toast（`drawNotice` 返回 false），绝不写空指针。
 
-### ❌ 坑 5：休息时间用“循环每 1 分钟 -1”计数器 → 灭屏睡眠后算错（**本次要修**）
+### ❌ 坑 5：休息时间用“循环每 1 分钟 -1”计数器 → 灭屏睡眠后算错（**已修**）
 - **现象**：单次到时进入强制休息；灭屏（系统睡眠）超过设定休息时长后，亮屏打开游戏仍提示“休息时间没到”被关。
 - **根因**：`restRemainingMin_--` 依赖监控循环每 1 分钟跑一次；**系统睡眠时监控线程被挂起，循环不执行，计数器冻结**。真实墙钟已超设定休息时长，但 `restRemainingMin_` 没减，于是仍判为“休息中”。
 - **正确做法**：用**绝对墙钟结束时间**判断：
@@ -55,7 +55,21 @@
   // 进入休息：restEndTs_ = nowNs() + (u64)restMin * 60 * 1'000'000'000;  // 纳秒
   // 守卫中： if (nowNs() >= restEndTs_) { 休息结束 }
   ```
-  `nowNs()` 用 `timeGetCurrentTime(TimeType_LocalSystemClock, &ts)`（RTC 墙钟，**睡眠也前进**）。详见 fix/rest-time 分支的 `monitor.cpp`。
+
+### ❌ 坑 5（二次修复）：`timeGetCurrentTime` 取 RTC 墙钟在 sysmodule 睡眠/唤醒后偶发失败 → 仍卡 30 分钟
+- **现象**：v1.3.7-restfix 已改用绝对墙钟结束时间，但用户实测休息一段时间后**仍卡在 30 分钟**、计时逻辑“没跑”。
+- **根因**：`nowNs()` 用 `timeGetCurrentTime(TimeType_LocalSystemClock)` 读 `time` 服务。sysmodule 走 boot2、在系统灭屏睡眠再唤醒后，`time` 服务会话偶发返回 **0 或冻结值**（会话陈旧/缓存未刷新），于是 `now(0) < restEndTs_` 永远成立，休息倒计时永不结束 → 卡在 30 分钟，亮屏后照关游戏。
+- **正确做法（v1.3.8）**：`nowNs()` 改用 **ARM 系统节拍计数器**（内核 syscall，不依赖任何系统服务）：
+  ```cpp
+  u64 nowNs() {
+      const u64 ticks = armGetSystemTick();          // cntvct_el0, always-on 硬件计时器
+      return (ticks * 1000000000ULL) / 19200000ULL;  // Tegra X1/X2 = 19.2MHz
+  }
+  ```
+  - 该计数器由常驻(always-on)硬件计时器驱动，**灭屏睡眠也持续前进**；
+  - 是内核 syscall，**不依赖 `time` 服务**，睡眠/唤醒不会失败或冻结 → 彻底消除卡死。
+  - 配套诊断日志：休息期间每轮输出 `[Monitor] Forced rest: N min left (now=... restEnd=...)`，可直接从 `sysmodule.log` 确认倒计时在跑、到点解封。
+  - ⚠️ **注意**：`today()`（每日统计用日期）仍依赖 `time` 服务，保持 `static bool timeReady` 只初始化一次（坑 8）；但**休息倒计时不要再依赖 `time` 服务**。
 
 ### ❌ 坑 6：Overlay 只在启动时探测一次服务 → 缓存 false 后永不自愈
 - **正确做法**：`MainMenuPanel::update()` 周期性重探测 `connectToService()`，服务上线即翻转 `is_available` 并重绘。该模式（v1.3.12）保留，回退到 1.3.7 后若仍要消除 not installed，需把这段逻辑移植回去。
@@ -75,7 +89,8 @@
 
 ---
 
-## 三、当前待办（基于 1.3.7 新分支）
-1. **修休息时间计算 bug**（坑 5）：用墙钟结束时间，见 `fix/rest-time` 分支。
+## 三、当前状态（基于 1.3.7 新分支 `fix/rest-time`）
+1. ✅ **休息时间计算 bug（坑 5 及二次修复）已修**：先改为绝对墙钟结束时间，再因 `time` 服务在睡眠/唤醒后偶发失败，改为 ARM 系统节拍计数器（`armGetSystemTick`）。已发布 `restfix-v1.3.8`（最新 Release）。
+2. ⏸️ `main` 保持 v1.3.7（干净回退基线）；`archive/attempts-v1.3.8-v1.3.12` 保留有问题的尝试线，供复盘。
 2. not installed：1.3.7 在用户硬件上“服务可用但晚注册”，若仍要彻底消除，需把 v1.3.12 的 Overlay 重探测逻辑移植回来（坑 2 + 坑 6）。
 3. 部署前确认 sysmodule 真的在跑（坑 7），否则一切限玩逻辑无效。
