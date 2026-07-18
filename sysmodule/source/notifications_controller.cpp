@@ -58,9 +58,11 @@ void NotificationsController::notifyRestOver()
 
 void NotificationsController::notifyRestActive(int remainingMin)
 {
+    // 提示刻意缩短：UltraHand 通知弹窗固定 448px 宽、字号被钳到 34，
+    // 过长文本会被 scissor 裁掉末尾（看不到“Game closed.”等）。保持单行 ≤ ~22 字符以完整显示。
     std::string message = remainingMin > 0
-        ? "Forced rest: " + std::to_string(remainingMin) + " min left. Game closed."
-        : "Forced rest active. Game closed until daily limit resets.";
+        ? "Rest: " + std::to_string(remainingMin) + " min left"
+        : "Rest until daily reset";
     UltraHandInterface::writeNotification(message, kNoticeFontSize, kNoticePriority);
 }
 

@@ -28,6 +28,10 @@ namespace {
 
 constexpr std::chrono::minutes MainLoopDelayInMinutes = 1min;
 constexpr std::chrono::nanoseconds MainLoopDelayInNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(MainLoopDelayInMinutes); 
+// 休息守卫内的轮询间隔更短：让“休息中”提示更频繁出现（避免亮屏瞬间错过 2.5s 弹窗），
+// 同时让休息到点后更快解封（原 1 分钟粒度太粗）。
+constexpr std::chrono::seconds RestLoopDelayInSeconds = 15s;
+constexpr std::chrono::nanoseconds RestLoopDelayInNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(RestLoopDelayInSeconds);
 
 namespace alefbet::pctrl::srv {   
 
@@ -109,7 +113,7 @@ namespace alefbet::pctrl::srv {
                     logInfo("[Monitor] Forced rest finished, play allowed again\n");
                     NotificationsController::notifyRestOver();
                 }
-                svcSleepThread(MainLoopDelayInNanos.count());
+                svcSleepThread(RestLoopDelayInNanos.count()); // 休息守卫内 15s 轮询：提示更频繁、到点更快解封
                 continue; // 已 sleep，安全返回循环顶部
             }
 
@@ -189,6 +193,7 @@ namespace alefbet::pctrl::srv {
                             restEndTs_ = nowNs() + (u64)restMin * 60ULL * 1000000000ULL;
                             logInfo("[Monitor] Forced rest started: %u min, restEndTs_=%llu\n",
                                     restMin, (unsigned long long)restEndTs_);
+                            NotificationsController::notifyRestActive(restMin); // 立即提示，避免亮屏瞬间错过
                             sessionElapsedMin_ = 0;
                         }
                     } else {

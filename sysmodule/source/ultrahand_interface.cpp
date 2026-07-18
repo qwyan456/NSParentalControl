@@ -28,6 +28,11 @@ void UltraHandInterface::writeNotification(const std::string& message, int fontS
         return;
     }
 
+    // 清理上一条通知文件：UltraHand 显示后不会自动删除 .notify，
+    // 长期运行会累积成百上千个文件，拖慢其 300ms 轮询目录的速度（间接导致提示偶发不显示）。
+    // 每条通知只保留最新一个即可（已显示的旧文件不会再被 UltraHand 重显）。
+    static std::string lastFilename;
+
     // Generate filename with timestamp
     u64 tick = armGetSystemTick();
     std::string filename = "NSParentalControl-" + std::to_string(tick) + ".notify";
@@ -37,6 +42,13 @@ void UltraHandInterface::writeNotification(const std::string& message, int fontS
         logError("[Ultrahand] Could not create notification file\n");
         return;
     }
+
+    // 新文件已创建成功，再删除上一条（避免创建失败时把旧通知也弄丢）
+    if(!lastFilename.empty()) {
+        std::string prev = "/config/ultrahand/notifications/" + lastFilename;
+        fsFsDeleteFile(&sdmc, prev.c_str()); // best-effort
+    }
+    lastFilename = filename; // 记录以便下次清理
 
     if(R_SUCCEEDED(fsFsOpenFile(&sdmc, fullPath.c_str(), FsOpenMode_Write | FsOpenMode_Append, &handle))) {        
         nlohmann::json j;
