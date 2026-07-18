@@ -95,6 +95,30 @@
   - ⚠️ **注意**：想让提示更大/更久，不能只靠 sysmodule 侧——字号被 UltraHand 钳到 34、时长固定 2.5s，要改需动 `libultrahand`（不在本仓库）。
   - 只要 sysmodule 不运行，任何限玩/休息逻辑都不会生效。
 
+### ❌ 坑 9（续）：全量审计其余 toast 文案 → 还有 3 条会裁切（v1.3.10）
+- **现象**：v1.3.9 只修了「休息中」一条；用户要求“check 其它场景字符显示不全”。
+- **审计方法（可复现）**：用仓库内 `libultrahand/libtesla/include/stb_truetype.h`，按设备同款公式
+  `像素宽 = Σ(字形 xAdvance × ScaleForPixelHeight(font, fontSize))` 测量每条文案。
+  用 **DejaVuSans（比 Switch 共享字体更宽）做保守上界**：DejaVu 下 ≤ 448px 即真机必不裁。
+- **实测结果（font=34，弹窗 448px）**：
+
+  | 提示 | 原文案 | 宽度 | 结论 |
+  |---|---|---|---|
+  | 时间到(日额度耗尽) | `Time's up! The game will close.` | 461 | ❌裁切 |
+  | 单次到时·有休息 | `Session time up! Rest N min.` | 439 | ⚠️临界(98%) |
+  | 单次到时·无休息 | `Session time up! Paused until daily limit resets.` | 695 | ❌严重裁切 |
+  | 休息结束 | `Break over - you can play now.` | 454 | ❌裁切 |
+  | 监控已启用 | `Parental Control enabled` | 300 | ✅放得下 |
+  | 剩余时间 | `0h 54mn left` | 155 | ✅ |
+  | 休息中 | `Rest: N min left` / `Rest until daily reset` | 243/302 | ✅(v1.3.9已修) |
+
+- **正确做法（v1.3.10）**：把 4 条超长文案统一缩短（实测 ≤ 348px，余量 ~100px）：
+  - `Time's up! The game will close.` → `Time up! Closing game.`
+  - `Session time up! Rest N min.` → `Time up! Rest N min.`
+  - `Session time up! Paused until daily limit resets.` → `Time up! Daily limit.`
+  - `Break over - you can play now.` → `Break over! Play now.`
+  - 文本在弹窗内**居中绘制**，超出部分 scissor 裁掉**两端**（不单末尾），故临界文案也一并缩短留余量。
+
 ### ❌ 坑 8：`timeInitialize()` 每次调用不退出 → time 服务 session 耗尽
 - **现象**：`today()` 返回空串，统计静默停止（进程不崩）。
 - **根因**：每次调用 `today()` 都 `timeInitialize()` 而不 `timeExit()`，session 耗尽后 `timeInitialize()` 失败。
@@ -103,7 +127,8 @@
 ---
 
 ## 三、当前状态（基于 1.3.7 新分支 `fix/rest-time`）
-1. ✅ **休息时间计算 bug（坑 5 及二次修复）已修**：先改为绝对墙钟结束时间，再因 `time` 服务在睡眠/唤醒后偶发失败，改为 ARM 系统节拍计数器（`armGetSystemTick`）。已发布 `restfix-v1.3.8`（最新 Release）。
-2. ⏸️ `main` 保持 v1.3.7（干净回退基线）；`archive/attempts-v1.3.8-v1.3.12` 保留有问题的尝试线，供复盘。
-2. not installed：1.3.7 在用户硬件上“服务可用但晚注册”，若仍要彻底消除，需把 v1.3.12 的 Overlay 重探测逻辑移植回来（坑 2 + 坑 6）。
-3. 部署前确认 sysmodule 真的在跑（坑 7），否则一切限玩逻辑无效。
+1. ✅ **休息时间计算 bug（坑 5 及二次修复）已修**：先改为绝对墙钟结束时间，再因 `time` 服务在睡眠/唤醒后偶发失败，改为 ARM 系统节拍计数器（`armGetSystemTick`）。已发布 `restfix-v1.3.8`。
+2. ✅ **UltraHand 通知修复（坑 9 + 续）**：v1.3.9 修“偶发不显示 + 休息提示裁切 + .notify 堆积”；v1.3.10 全量审计其余 toast，把 3 条（临界 1 条）超长文案缩短防裁切。最新 Release = `restfix-v1.3.10`。
+3. ⏸️ `main` 保持 v1.3.7（干净回退基线）；`archive/attempts-v1.3.8-v1.3.12` 保留有问题的尝试线，供复盘。
+4. not installed：1.3.7 在用户硬件上“服务可用但晚注册”，若仍要彻底消除，需把 v1.3.12 的 Overlay 重探测逻辑移植回来（坑 2 + 坑 6）。
+5. 部署前确认 sysmodule 真的在跑（坑 7），否则一切限玩逻辑无效。

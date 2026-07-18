@@ -6,7 +6,10 @@
 using namespace std::chrono;
 
 // 醒目通知参数：比默认(28/1)更大的字号与更高的优先级，让 UltraHand toast 更显眼
-constexpr int kNoticeFontSize = 44;
+// 注意：UltraHand 通知弹窗固定 448px 宽、字号被钳到 34、文本居中绘制且超出部分被
+// scissor 裁掉（两端都会丢字）。已在本机用 DejaVuSans(比 Switch 共享字体更宽)做保守
+// 上界测量：所有提示文案在 font=34 下实测 ≤ 348px（余量 ~100px），可确保真机不裁切。
+constexpr int kNoticeFontSize = 44;   // 会被 UltraHand 钳到 34
 constexpr int kNoticePriority = 5;
 
 // 以「重复发送 + 间隔」的方式延长通知在屏幕上的可见时间。
@@ -40,20 +43,23 @@ void NotificationsController::notifyRemainingTime(int remainingTimeInMinutes)
 
 void NotificationsController::notifyTimeExpired()
 {
-    notifyWithEmphasis("Time's up! The game will close.");
+    // 原 "Time's up! The game will close." 在 448px/34 字号下被裁切(实测 461px)，缩短为 348px
+    notifyWithEmphasis("Time up! Closing game.");
 }
 
 void NotificationsController::notifySessionExpired(int restMin)
 {
+    // 原文案过长会被裁切(短版 439px 临界/长版 695px 严重裁切)，统一缩短为 ≤ 344px
     std::string message = restMin > 0
-        ? "Session time up! Rest " + std::to_string(restMin) + " min."
-        : "Session time up! Paused until daily limit resets.";
+        ? "Time up! Rest " + std::to_string(restMin) + " min."
+        : "Time up! Daily limit.";
     notifyWithEmphasis(message);
 }
 
 void NotificationsController::notifyRestOver()
 {
-    notifyWithEmphasis("Break over - you can play now.");
+    // 原 "Break over - you can play now." 在 448px/34 字号下被裁切(实测 454px)，缩短为 320px
+    notifyWithEmphasis("Break over! Play now.");
 }
 
 void NotificationsController::notifyRestActive(int remainingMin)
