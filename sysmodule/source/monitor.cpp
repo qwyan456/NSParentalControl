@@ -14,20 +14,15 @@ using namespace alefbet::pctrl::database;
 using namespace std::chrono_literals;
 
 namespace {
-    // 当前墙钟时间（纳秒，TimeType_LocalSystemClock）。
-    // 用 RTC 真实时间，系统灭屏睡眠时也前进——这是修复休息倒计时 bug 的关键。
+    // 当前墙钟时间（纳秒），基于 ARM 系统节拍计数器(cntvct_el0, 内核 syscall)。
+    // 关键：该计数器由常驻(always-on)硬件计时器驱动，
+    //   1) 系统灭屏睡眠时也持续前进（RTC/常驻时钟不随进程挂起而停止）；
+    //   2) 不依赖 time 服务，避免 sleep/wake 后 timeGetCurrentTime 偶发返回 0 / 冻结，
+    //      导致 `now < restEndTs_` 永远成立、休息倒计时卡在 30 分钟无法结束（坑5 二次修复）。
+    // Tegra X1/X2 节拍频率为 19.2MHz：ns = ticks * 1e9 / 19_200_000。
     u64 nowNs() {
-        static bool timeReady = false;
-        if(!timeReady) {
-            ::Result irc = timeInitialize();
-            if(R_SUCCEEDED(irc)) timeReady = true;
-        }
-        u64 ts = 0;
-        ::Result rc = timeGetCurrentTime(TimeType_LocalSystemClock, &ts);
-        if(R_FAILED(rc)) {
-            logError("[Monitor] nowNs: timeGetCurrentTime 失败 (%i:%i)\n", R_MODULE(rc), R_DESCRIPTION(rc));
-        }
-        return ts;
+        const u64 ticks = armGetSystemTick();
+        return (ticks * 1000000000ULL) / 19200000ULL;
     }
 }
 
@@ -105,6 +100,8 @@ namespace alefbet::pctrl::srv {
                     remainingMin = (int)((remainNs + 59999999999ULL) / 60000000000ULL); // 向上取整到分钟
                     if(remainingMin < 1) remainingMin = 1;
                 }
+                logInfo("[Monitor] Forced rest: %i min left (now=%llu restEnd=%llu)\n",
+                        remainingMin, (unsigned long long)now, (unsigned long long)restEndTs_);
                 NotificationsController::notifyRestActive(remainingMin); // 提示被关原因与剩余休息时长
                 if(now >= restEndTs_) {
                     inRest_ = false;
@@ -186,9 +183,12 @@ namespace alefbet::pctrl::srv {
                             inRest_ = true;
                             // FIX(坑5): 用绝对墙钟结束时间，而非“每循环 -1 分钟”计数器。
                             // 系统灭屏睡眠时监控线程被挂起，计数器冻结，真实时间已超设定休息时长，
-                            // 亮屏后打开游戏仍被判“休息未到”反复关闭。restEndTs_ 基于 RTC 墙钟（睡眠也前进），
+                            // 亮屏后打开游戏仍被判“休息未到”反复关闭。
+                            // restEndTs_ 基于 ARM 系统节拍计数器(nowNs)：睡眠也前进、且不依赖 time 服务，
                             // 亮屏后 nowNs() >= restEndTs_ 即判定休息结束。
                             restEndTs_ = nowNs() + (u64)restMin * 60ULL * 1000000000ULL;
+                            logInfo("[Monitor] Forced rest started: %u min, restEndTs_=%llu\n",
+                                    restMin, (unsigned long long)restEndTs_);
                             sessionElapsedMin_ = 0;
                         }
                     } else {
