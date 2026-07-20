@@ -179,6 +179,11 @@ namespace alefbet::pctrl::srv {
 
                         if(remainingTimeInMinutes <= 0) {
                             // 每日额度耗尽 → 永久封锁（优先于单次休息）
+                            // 坑11: 清零单次累计，避免残留值随全局 sessionElapsedMin_ 串到下一个用户，
+                            // 导致其还没玩满 sessionLimit 就被误判“需要休息锁定”。
+                            // 注意：只在“日限额耗尽”这里清零（不在关游戏/切账号时清零），
+                            // 否则小孩可借关游戏重开或切账号把单次计时清零来逃避强制休息。
+                            sessionElapsedMin_ = 0;
                             logInfo("[Monitor] Timeout for the user %s\n", user.nickname.c_str());
                             // v1.3.5: 不再渲染全屏超时界面。sysmodule 内存受限，1.9MB 帧缓冲
                             // 无法分配（aligned_alloc/tmemCreate 在 512KB 进程堆上失败；
